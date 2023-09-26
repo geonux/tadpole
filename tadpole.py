@@ -21,15 +21,15 @@ from PyQt5.QtWidgets import *
 from PyQt5.QtGui import *
 from PyQt5.QtCore import Qt, QTimer, QSize
 # OS imports - these should probably be moved somewhere else
-
 import sys
 import shutil
 import hashlib
+
 # Tadpole imports
 import frogtool
 import tadpole_functions
 from tadpoleConfig import TadpoleConfig
-#from dialogs import *
+# Dialog imports
 from dialogs.SettingsDialog import SettingsDialog
 from dialogs.ThumbnailDialog import ThumbnailDialog
 from dialogs.BootConfirmDialog import BootConfirmDialog
@@ -37,15 +37,12 @@ from dialogs.DownloadProgressDialog import DownloadProgressDialog
 from dialogs.GameShortcutIconsDialog import GameShortcutIconsDialog
 from dialogs.MusicConfirmDialog import MusicConfirmDialog
 from dialogs.ReadmeDialog import ReadmeDialog
-from dialogs.PleaseWaitDialog import PleaseWaitDialog
-
 
 #feature imports
 import requests
 import psutil
 import json
 from bs4 import BeautifulSoup
-from PIL import Image, ImageDraw
 from datetime import datetime
 from pathlib import Path
 import configparser
@@ -213,7 +210,7 @@ The SF2000 may not boot.  You can always try this fix again in the Firmware opti
             downloadedchecksum = hashlib.file_digest(f, 'sha256').hexdigest()
         #check if the hash matches
         print("Checking if " + bootloaderChecksum + " matches " + downloadedchecksum)
-        if bootloaderChecksum != downloadedchecksum:
+        if bootloaderChecksum != downloadedchecksum: # TODO Consider that this may create an infinite loop if the file becomes unavailable or changes
             QMessageBox().about(window, "Update not successful", "The downloaded file did not download correctly.\n\
 Tadpole will try the process again. For more help consult https://github.com/vonmillhausen/sf2000#bootloader-bug\n\
 or ask for help on Discord https://discord.gg/retrohandhelds.")
@@ -247,6 +244,7 @@ Consult https://github.com/vonmillhausen/sf2000#bootloader-bug or ask for help o
         QMessageBox().about(window, "Download did not complete", "Please ensure you have internet and retry the fix")
         logging.error("Bootloader failed to download")
         return
+
 
 def FixSF2000BootLight():
         drive = window.combobox_drive.currentText()
@@ -586,11 +584,6 @@ class MainWindow (QMainWindow):
         self.menu_os.menu_boot_logo.addAction(UpdateBootLogoAction)
 
         #Menus for console logos
-        # self.menu_consoleLogos = self.menu_os.addMenu("Console Logos")
-        # self.action_consolelogos_Default = QAction("Restore Default", self, triggered=self.ConsoleLogos_RestoreDefault)
-        # self.menu_consoleLogos.addAction(self.action_consolelogos_Default)
-        # self.action_consolelogos_Western = QAction("Use Western Logos", self, triggered=self.ConsoleLogos_WesternLogos)
-        # self.menu_consoleLogos.addAction(self.action_consolelogos_Western)
         self.menu_os.menu_bios = self.menu_os.addMenu("Emulator BIOS")
         self.GBABIOSFix_action = QAction(QIcon(self.style().standardIcon(QStyle.StandardPixmap.SP_DialogSaveButton)), "Update GBA BIOS", self, triggered=self.GBABIOSFix)
         self.menu_os.menu_bios.addAction(self.GBABIOSFix_action)
@@ -624,9 +617,6 @@ class MainWindow (QMainWindow):
 
     def catchTableCellClicked(self, clickedRow, clickedColumn):
         print(f"clicked Cell for ({clickedRow},{clickedColumn})")
-        drive = self.combobox_drive.currentText()
-        system = self.combobox_console.currentText() 
-        gamename = self.tbl_gamelist.item(clickedRow, 0)
         objGame = self.ROMList[clickedRow]
         if self.tbl_gamelist.horizontalHeaderItem(clickedColumn).text() == self._static_columns_Thumbnail:  
             viewThumbnail(objGame.ROMlocation)
@@ -718,8 +708,6 @@ class MainWindow (QMainWindow):
                 toggle_features(False)
                 #TODO Should probably also clear the table of the ROMs that are still listed
             self.combobox_drive.setCurrentText(current_drive)
-
-
 
     def testFunction(self):
         print("Called test function. Remember to disable this before publishing")
