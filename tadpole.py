@@ -794,8 +794,15 @@ from tzlion on frogtool. Special thanks also goes to wikkiewikkie & Jason Grieve
                 if console == 'ARCADE':
                     arcadeZIPROM = tadpole_functions.extractFileNameFromZFB(rom_path)
                     arcadeZIPPath = os.path.join(drive, console, 'bin', arcadeZIPROM)
-                    os.remove(arcadeZIPPath)
-                os.remove(rom_path)
+                    if os.path.exists(arcadeZIPPath):
+                        os.remove(arcadeZIPPath)
+                    else:
+                        logging.error("File {arcadeZIPPath} doens't exist")
+                if os.path.exists(rom_path):      
+                    os.remove(rom_path)
+                else:
+                    logging.error("File {rom_path} doens't exist")
+                    QMessageBox.about(self, "Error","Could not delete file.")
             except Exception:
                 QMessageBox.about(self, "Error","Could not delete file.")
             RunFrogTool(drive,console)
