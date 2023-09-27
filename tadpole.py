@@ -734,7 +734,6 @@ from tzlion on frogtool. Special thanks also goes to wikkiewikkie & Jason Grieve
                 return False
 
     def formatAndDownloadOSFiles(self):
-        logging.info(f"Tadpole~viewThumbnail: ({rom_path})")
         foundSD = False
         QMessageBox.about(self, "Formatting", "First format your SD card. After pressing OK the partition tool will come up enabling you to format it.\n\n\
     Format it to with a drive letter and to FAT32.  It may say the drive is in use; that is Normal as Tadpole is looking for it.")

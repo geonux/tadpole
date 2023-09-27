@@ -426,8 +426,6 @@ def changeGameShortcut(drive, console, position, game):
         raise Exception_InvalidConsole
         
     try:
-        trimmedGameName = frogtool.strip_file_extension(game)
-        #print(f"Filename trimmed to: {trimmedGameName}")
         #Read in all the existing shortcuts from file
         xfgle_filepath = os.path.join(drive, "Resources", "xfgle.hgp")
         xfgle_file_handle = open(xfgle_filepath, "r")
@@ -438,6 +436,8 @@ def changeGameShortcut(drive, console, position, game):
         if console == 'ARCADE':
             #Arcade is special as its location is embedded in the ZFB
             #so we need to go get it
+            #Regression fix: we must pass in the zfb as that is the path
+            game = game + '.zfb'
             ROM_path = os.path.join(drive, console, game)
             game = extractFileNameFromZFB(ROM_path)
         # Overwrite the one line we want to change
