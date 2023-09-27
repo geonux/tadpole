@@ -24,6 +24,7 @@ from PyQt5.QtCore import Qt, QTimer, QSize
 import sys
 import shutil
 import hashlib
+import time
 
 # Tadpole imports
 import frogtool
@@ -59,8 +60,7 @@ poll_drives = True
 
 tpConf = TadpoleConfig()
 
-def RunFrogTool(console):
-    drive = window.combobox_drive.currentText()
+def RunFrogTool(drive, console):
     if drive == 'N/A':
         logging.warning("You are trying to run froggy with no drive.")
         return
@@ -68,10 +68,6 @@ def RunFrogTool(console):
     logging.info(f"Running frogtool with drive ({drive}) and console ({console})")
     try:
         #TODO: should probably replace this with rebuilding the favourites list at some point
-        #NOTE: Eric, I think its a better experience to not nuke these.  
-        #NOTE: if the user deletes a favorited ROM, the system fails gravcefully.  Deleting each time is rough on user
-        #tadpole_functions.emptyFavourites(drive)
-        #tadpole_functions.emptyHistory(drive)
         if(console == static_AllSystems):
             #Give progress to user if rebuilding has hundreds of ROMS
             rebuildingmsgBox = DownloadProgressDialog()
@@ -95,275 +91,6 @@ def RunFrogTool(console):
         window.loadROMsToTable()
     except frogtool.StopExecution:
         pass
-
-
-def toggle_features(enable: bool):
-    """Toggles program features on or off"""
-    features = [window.btn_update_thumbnails,
-                window.btn_update,
-                window.btn_update_shortcuts_images,
-                window.combobox_console,
-                window.combobox_drive,
-                window.menu_os,
-                window.menu_roms,
-                window.tbl_gamelist]
-    for feature in features:
-        feature.setEnabled(enable)
-
-
-
-def viewThumbnail(rom_path):
-    window.window_thumbnail = ThumbnailDialog(rom_path)  
-    result = window.window_thumbnail.exec()
-    drive = window.combobox_drive.currentText()
-    system = window.combobox_console.currentText()
-    if result:
-        newLogoFileName = window.window_thumbnail.new_viewer.path
-        print(f"user tried to load image: {newLogoFileName}")
-        if newLogoFileName is None or newLogoFileName == "":
-            print("user cancelled image select")
-            return
-        if tadpole_functions.addThumbnail(rom_path, drive, system, newLogoFileName, True):
-            QMessageBox.about(window, "Change ROM Logo", "ROM thumbnails successfully changed")
-            RunFrogTool(window.combobox_console.currentText())
-            return True
-        else:
-            QMessageBox.about(window, "Change ROM Cover", "Unable to convert thumbnail for ROM")
-            RunFrogTool(window.combobox_console.currentText())
-            return False
-
-def deleteROM(rom_path):
-    console = window.combobox_console.currentText()
-    drive = window.combobox_drive.currentData()
-    qm = QMessageBox
-    ret = qm.question(window,'Delete ROM?', "Are you sure you want to delete " + rom_path +" and rebuild the ROM list? " , qm.Yes | qm.No)
-    if ret == qm.Yes:
-        try:
-            if console == 'ARCADE':
-                arcadeZIPROM = tadpole_functions.extractFileNameFromZFB(rom_path)
-                arcadeZIPPath = os.path.join(drive, console, 'bin', arcadeZIPROM)
-                os.remove(arcadeZIPPath)
-            os.remove(rom_path)
-        except Exception:
-            QMessageBox.about(window, "Error","Could not delete file.")
-        RunFrogTool(console)
-    return
-
-def addToShortcuts(rom_path):
-    qm = QMessageBox
-    qm.setText("Time to set the rompath!")
-
-def BGM_change(source=""):
-    # Check the selected drive looks like a Frog card
-    drive = window.combobox_drive.currentText()
-    
-    if not tadpole_functions.checkDriveLooksFroggy(drive):
-        QMessageBox.about(window, "Something doesn't Look Right", "The selected drive doesn't contain critical \
-        SF2000 files. The action you selected has been aborted for your safety.")
-        return
-
-    msg_box = DownloadProgressDialog()
-    msg_box.setText("Downloading background music.")
-    msg_box.show()
-    msg_box.showProgress(25, True)
-
-    if source[0:4] == "http":  # internet-based
-        result = tadpole_functions.changeBackgroundMusic(drive, url=source)
-    else:  # local resource
-        result = tadpole_functions.changeBackgroundMusic(drive, file=source)
-
-    if result:
-        msg_box.close()
-        QMessageBox.about(window, "Success", "Background music changed successfully")
-    else:
-        msg_box.close()
-        QMessageBox.about(window, "Failure", "Something went wrong while trying to change the background music")
-
-def bootloaderPatch():
-    qm = QMessageBox
-    ret = qm.question(window, "Download fix", "Patching the bootloader will require your SD card and that the SF2000 is well charged.  Do you want to download the fix?")
-    if ret == qm.No:
-        return
-    #cleanup previous files
-    drive = window.combobox_drive.currentText()
-    if drive == "N/A":
-        ret = QMessageBox().question(window, "Insert SD Card", "To fix the bootloader, you must have your SD card plugged in as it downloads critical \
-updates to the SD card to update the bootlaoder.  Do you want to plug it in and try detection agian?")
-        if ret == qm.Yes:
-            bootloaderPatch()
-        elif ret == qm.No:
-            QMessageBox().about("Update skipped", "No problem.  Just remember if you change any files on the SD card without the bootlaoder \
-The SF2000 may not boot.  You can always try this fix again in the Firmware options")
-            logging.info("User skipped bootloader")
-            return
-    bootloaderPatchDir = os.path.join(drive,"/UpdateFirmware/")
-    bootloaderPatchPathFile = os.path.join(drive,"/UpdateFirmware/Firmware.upk")
-    bootloaderChecksum = "eb7a4e9c8aba9f133696d4ea31c1efa50abd85edc1321ce8917becdc98a66927"
-    #Let's delete old stuff if it exits incase they tried this before and failed
-    if Path(bootloaderPatchDir).is_dir():
-        shutil.rmtree(bootloaderPatchDir)
-    os.mkdir(bootloaderPatchDir)
-    #Download file, and continue if its successful
-    if tadpole_functions.downloadFileFromGithub(bootloaderPatchPathFile, "https://github.com/EricGoldsteinNz/SF2000_Resources/blob/60659cc783263614c20a60f6e2dd689d319c04f6/OS/Firmware.upk?raw=true"):
-        #check file correctly download
-        with open(bootloaderPatchPathFile, 'rb', buffering=0) as f:
-            downloadedchecksum = hashlib.file_digest(f, 'sha256').hexdigest()
-        #check if the hash matches
-        print("Checking if " + bootloaderChecksum + " matches " + downloadedchecksum)
-        if bootloaderChecksum != downloadedchecksum: # TODO Consider that this may create an infinite loop if the file becomes unavailable or changes
-            QMessageBox().about(window, "Update not successful", "The downloaded file did not download correctly.\n\
-Tadpole will try the process again. For more help consult https://github.com/vonmillhausen/sf2000#bootloader-bug\n\
-or ask for help on Discord https://discord.gg/retrohandhelds.")
-            bootloaderPatch()
-        ret = QMessageBox().warning(window, "Bootloader Fix", "Downloaded bootloader to SD card.\n\n\
-You can keep this window open while you appy the fix:\n\
-1. Eject the SD card from your computer\n\
-2. Put the SD back in the SF2000)\n\
-3. Turn the SF2000 on\n\
-4. You should see a message in the lower-left corner of the screen indicating that patching is taking place.\n\
-5. The process will only last a few seconds\n\
-6. You should see the main menu on the SF2000\n\
-7. Power off the SF2000\n\
-8. Remove the SD card \n\
-9. Connect the SD card back to your computer \n\n\
-Did the update complete successfully?", qm.Yes | qm.No)
-        if Path(bootloaderPatchDir).is_dir():
-            shutil.rmtree(bootloaderPatchDir)
-        if ret == qm.Yes:
-            QMessageBox().about(window, "Update complete", "Your SF2000 should now be safe to use with \
-Tadpole. Major thanks to osaka#9664 on RetroHandhelds Discords for this fix!\n\n\
-Remember, you only need to apply the bootloader fix once to your SF2000.  Unlike other changes affecting the SD card, this changes the code running on the SF2000.")
-            logging.info("Bootloader installed correctly...or so the user says")
-            return
-        else:
-            QMessageBox().about(window, "Update not successful", "Based on your answer, the update did not complete successfully.\n\n\
-Consult https://github.com/vonmillhausen/sf2000#bootloader-bug or ask for help on Discord https://discord.gg/retrohandhelds. ")
-            logging.error("Bootloader failed to install...or so the user says")
-            return
-    else:
-        QMessageBox().about(window, "Download did not complete", "Please ensure you have internet and retry the fix")
-        logging.error("Bootloader failed to download")
-        return
-
-
-def FixSF2000BootLight():
-        drive = window.combobox_drive.currentText()
-        temp_file_bios_path = os.path.join(drive, 'bios', 'file.tmp')
-        qm = QMessageBox
-        ret = qm.question(window, "SF2000 not booting", "If your SF2000 won't boot, you likely hit the bootloader bug or have broken some critical files.  This process attempts to restore your SF2000.\n\n\
-This only works on the Windows OS.\n\nDo you want to continue?")
-        if ret == qm.No:
-            return
-        #create a new file in bios
-        Path.touch(temp_file_bios_path)
-        #delete that file
-        os.remove(temp_file_bios_path)
-        ret = qm.question(window, "Ready to test", "Please take out the SD card and plug it into the SF2000 and turn it on.\n\n\
-Did it boot?")
-        if ret == qm.Yes:
-            QMessageBox.about(window, "Success", "Please apply the bootloader fix now to avoid this issue again.  Sending you there now")
-            bootloaderPatch()
-            return
-        if ret == qm.No: 
-            #If no, repeat
-            #create a new file in bios
-            Path.touch(temp_file_bios_path)
-            #delete that file
-            os.remove(temp_file_bios_path)
-            ret = qm.question(window, "Try again", "We attempted one more fix at replacing the bisrv.asd file.  Please take out the SD card now and try one more time\n\n\
-Did it boot this time?")
-            if ret == qm.Yes:
-                QMessageBox.about(window, "Success", "Please apply the bootloader fix now to avoid this issue again.  Sending you there now")
-                bootloaderPatch()
-                return
-            if ret == qm.No: 
-                QMessageBox.about(window, "Error", "The simple fix did not succeed.  You need to reformat and install OS files.\n\n\
-Sending you to that option now")
-                FixSF2000Boot()
-                # if os.path.exists(temp_bisrv_path):
-                #     os.remove(temp_bisrv_path)
-                return
-def FixSF2000Boot():
-        qm = QMessageBox
-        ret = qm.question(window, "SF2000 not booting", "If your SF2000 won't boot, you likely hit the bootloader bug or have broken some critical files.  This process attempts to restore your SF2000.\n\n\
-This process will delete ALL SAVES AND ROMS, so if you want to save those, cancel out and do so.\n\n\
-This process is only tested on Windows and will not work on Linux/Mac.\n\nDo you want to proceed?")
-        if ret == qm.No:
-            return
-        # ret = qm.question(window,"Save backups?", "Do you want to backup your save files first?")
-        # if ret == qm.Yes:
-        #     MainWindow.createSaveBackup()    
-        #Turn off polling since we are going to mess with the SD card
-        turn_off_polling()
-        #Stop access to the drives
-        window.combobox_drive.addItem(QIcon(), static_NoDrives, static_NoDrives)
-        window.status_bar.showMessage("No SF2000 Drive Detected. Please insert SD card and try again.", 20000)
-        toggle_features(False)
-        formatAndDownloadOSFiles()
-        turn_on_polling()
-
-def turn_off_polling():
-        global poll_drives 
-        poll_drives = False
-
-def turn_on_polling():
-        global poll_drives 
-        poll_drives = True
-
-def formatAndDownloadOSFiles():
-        foundSD = False
-        QMessageBox.about(window, "Formatting", "First format your SD card. After pressing OK the partition tool will come up enabling you to format it.\n\n\
-Format it to with a drive letter and to FAT32.  It may say the drive is in use; that is Normal as Tadpole is looking for it.")
-        try:
-            subprocess.Popen('diskmgmt.msc', shell=True)
-        except:
-            logging.error("Can't run diskpart.  Wrong OS?")
-        qm = QMessageBox()
-        ret = qm.question(window, "Formatting", "Did you finish formatting it to FAT32?  Tadpole will now try to detect it.")
-        if ret == qm.No:
-            QMessageBox.about(window, "Formatting", "Please try formating the SD card and trying again.")
-            return False
-        for drive in psutil.disk_partitions():
-            if not os.path.exists(drive.mountpoint):
-                logging.info("Formatting prevented {drive} can't be read")
-                continue
-            dir = os.listdir(drive.mountpoint)
-            #Windows puts in a System inFormation item that is hidden
-            if len(dir) > 1:
-                logging.info("Formatting prevented {drive} isn't empty")
-                continue
-            if(drive.mountpoint == f'C:\\'):
-                logging.info("Formatting prevented, be ultra safe don't let them format C")
-                continue
-            ret = qm.question(window, "Empty SD card found", "Is the right SD card: " + drive.mountpoint + "?")
-            if ret == qm.Yes:
-                correct_drive = drive.mountpoint
-                foundSD = True
-                logging.info("SD card was formatted and is empty")
-                break
-            if ret == qm.No:
-                continue
-        if foundSD == False:
-            QMessageBox.about(window, "Empty SD card not found", "Looks like none of the mounted drives in Windows are empty SD cards. Are you sure you formatted it and it is empty?")
-            return False
-        msgBox = DownloadProgressDialog()
-        msgBox.setText("Downloading Firmware Update.")
-        msgBox.show()
-        tadpole_functions.DownloadOSFiles(correct_drive, msgBox.progress)
-        ret = QMessageBox.question(window, "Try booting",  "Try putting the SD card in the SF2000 and starting it.  Did it work?")
-        if ret == qm.No:
-            QMessageBox.about(window, "Not booting", "Sorry it didn't work; Consult https://github.com/vonmillhausen/sf2000#bootloader-bug or ask for help on Discord https://discord.gg/retrohandhelds.")
-            return False
-        
-        ret = QMessageBox.question(window, "Success",  "Congrats!  Now put the SD card back into the computer.\n\n\
-If you got into a bad state without patching the bootloader, you should patch it so you can make changes safely.  Do you want to patch the bootloader?")
-        if ret == qm.No:
-            return True
-        bootloaderPatch()
-        return True
-
-
-
 
 # SubClass QMainWindow to create a Tadpole general interface
 class MainWindow (QMainWindow):
@@ -473,6 +200,19 @@ class MainWindow (QMainWindow):
         self.timer.timeout.connect(self.reloadDriveList)
         self.timer.start(1000)
 
+
+    def toggle_features(self, enable: bool):
+        """Toggles program features on or off"""
+        features = [window.btn_update_thumbnails,
+                    window.btn_update,
+                    window.btn_update_shortcuts_images,
+                    window.combobox_console,
+                    window.combobox_drive,
+                    window.menu_os,
+                    window.menu_roms,
+                    window.tbl_gamelist]
+        for feature in features:
+            feature.setEnabled(enable)
     
     def create_actions(self):
         # File Menu
@@ -501,7 +241,7 @@ class MainWindow (QMainWindow):
         self.menu_os.menu_update.addSeparator()
         action_battery_fix  = QAction(QIcon(self.style().standardIcon(QStyle.StandardPixmap.SP_DialogSaveButton)), "Battery Fix - Built by commnity (Improves battery life & shows low power warning)", self, triggered=self.Battery_fix)                                                                              
         self.menu_os.menu_update.addAction(action_battery_fix)
-        action_bootloader_patch  = QAction(QIcon(self.style().standardIcon(QStyle.StandardPixmap.SP_DialogSaveButton)), "Bootloader Fix - Built by commnity (Prevents device from not booting and corrupting SD card when changing files on SD card)", self, triggered=bootloaderPatch)                                                                              
+        action_bootloader_patch  = QAction(QIcon(self.style().standardIcon(QStyle.StandardPixmap.SP_DialogSaveButton)), "Bootloader Fix - Built by commnity (Prevents device from not booting and corrupting SD card when changing files on SD card)", self, triggered=self.bootloaderPatch)                                                                              
         self.menu_os.menu_update.addAction(action_bootloader_patch)   
         #Sub-menu for updating themes
         self.menu_os.menu_change_theme = self.menu_os.addMenu("Theme")
@@ -596,9 +336,9 @@ class MainWindow (QMainWindow):
         self.menu_roms.addAction(BackupAllSaves_action)     
         # Help Menu
         self.menu_help = self.menuBar().addMenu("&Help")
-        action_sf2000_boot_light  = QAction(QIcon(self.style().standardIcon(QStyle.StandardPixmap.SP_DialogSaveButton)), "Fix SF2000 not booting - Attemps to fix only the firmaware file (bisrv.asd) ", self, triggered=FixSF2000BootLight)                                                                              
+        action_sf2000_boot_light  = QAction(QIcon(self.style().standardIcon(QStyle.StandardPixmap.SP_DialogSaveButton)), "Fix SF2000 not booting - Attemps to fix only the firmaware file (bisrv.asd) ", self, triggered=self.FixSF2000BootLight)                                                                              
         self.menu_help.addAction(action_sf2000_boot_light)
-        action_sf2000_boot  = QAction(QIcon(self.style().standardIcon(QStyle.StandardPixmap.SP_DialogSaveButton)), "Fix SF2000 not booting - Reformats SD card and reinstalls all OS files", self, triggered=FixSF2000Boot)                                                                              
+        action_sf2000_boot  = QAction(QIcon(self.style().standardIcon(QStyle.StandardPixmap.SP_DialogSaveButton)), "Fix SF2000 not booting - Reformats SD card and reinstalls all OS files", self, triggered=self.FixSF2000Boot)                                                                              
         self.menu_help.addAction(action_sf2000_boot)
         self.menu_help.addSeparator()
         self.readme_action = QAction(self.style().standardIcon(QStyle.StandardPixmap.SP_TitleBarContextHelpButton),
@@ -619,9 +359,9 @@ class MainWindow (QMainWindow):
         print(f"clicked Cell for ({clickedRow},{clickedColumn})")
         objGame = self.ROMList[clickedRow]
         if self.tbl_gamelist.horizontalHeaderItem(clickedColumn).text() == self._static_columns_Thumbnail:  
-            viewThumbnail(objGame.ROMlocation)
+            self.viewThumbnail(objGame.ROMlocation)
         elif self.tbl_gamelist.horizontalHeaderItem(clickedColumn).text() == self._static_columns_Delete: 
-            deleteROM(objGame.ROMlocation)
+            self.deleteROM(objGame.ROMlocation)
         #Only enable deleting when selcted
         if clickedColumn == 0:
             selected = self.tbl_gamelist.selectedItems()
@@ -677,10 +417,9 @@ class MainWindow (QMainWindow):
                 self.combobox_drive.addItem(QIcon(self.style().standardIcon(QStyle.StandardPixmap.SP_DriveHDIcon)),
                                                 localdrive,
                                                 localdrive)
-            #Load in all mounted partitions that have a bisrv.asd
-            # TODO migrate this to use looksFroggy
+            #Load in all mounted partitions that look Froggy
             for drive in psutil.disk_partitions():
-                if os.path.exists(os.path.join(drive.mountpoint, "bios", "bisrv.asd")):
+                if(tadpole_functions.checkDriveLooksFroggy(drive.mountpoint)):
                     self.combobox_drive.addItem(QIcon(self.style().standardIcon(QStyle.StandardPixmap.SP_DriveHDIcon)),
                                                 drive.mountpoint,
                                                 drive.mountpoint)
@@ -692,7 +431,7 @@ class MainWindow (QMainWindow):
                 self.btn_coppy_user_selected_button.setEnabled(False)
 
             if len(self.combobox_drive) > 0:
-                toggle_features(True)
+                self.toggle_features(True)
                 
                 #TODO: Replace this a comparison of the list items instead.
                 if(current_drive == static_NoDrives):
@@ -705,7 +444,7 @@ class MainWindow (QMainWindow):
                 # disable functions if nothing is in the combobox
                 self.combobox_drive.addItem(QIcon(), static_NoDrives, static_NoDrives)
                 self.status_bar.showMessage("No SF2000 Drive Detected. Please insert SD card and try again.", 2000)
-                toggle_features(False)
+                self.toggle_features(False)
                 #TODO Should probably also clear the table of the ROMs that are still listed
             self.combobox_drive.setCurrentText(current_drive)
 
@@ -715,7 +454,7 @@ class MainWindow (QMainWindow):
     def Settings(self):
         SettingsDialog(tpConf).exec()
         if(self.combobox_drive.currentText() != static_NoDrives):
-            RunFrogTool(self.combobox_console.currentText())
+            RunFrogTool(self.combobox_drive.currentText(), self.combobox_console.currentText())
 
     def detectOSVersion(self):
         print("Tadpole~DetectOSVersion: Trying to read bisrv hash")
@@ -841,14 +580,13 @@ the thumbnail for you. ")
                                     failedConversions += 1
                 msgBox.showProgress(i, True)
         msgBox.close()
-        RunFrogTool(self.combobox_console.currentText())
         if failedConversions == 0:
             QMessageBox.about(self, "Add thubmnails", "ROM thumbnails successfully changed")
-            RunFrogTool(self.combobox_console.currentText())
+            RunFrogTool(drive, system)
             return True
         else:
             QMessageBox.about(self, "Add thubmnails", "Adding thumbnails completed, but " + str(failedConversions) + " failed to convert.")
-            RunFrogTool(self.combobox_console.currentText())
+            RunFrogTool(drive, system)
             return False
         
     def change_background_music(self):
@@ -861,9 +599,9 @@ the thumbnail for you. ")
             local = False
         if d.exec():
             if local:
-                BGM_change(d.music_file)
+                self.BGM_change(d.music_file)
             else:
-                BGM_change(self.music_options[self.sender().text()])
+                self.BGM_change(self.music_options[self.sender().text()])
         if os.path.exists(os.path.join(static_TadpoleDir, 'preview.wav' )):
             os.remove(os.path.join(static_TadpoleDir, 'preview.wav'))
     def about(self):
@@ -922,7 +660,7 @@ from tzlion on frogtool. Special thanks also goes to wikkiewikkie & Jason Grieve
         console = self.combobox_console.currentText()
         logging.info(f"combobox for drive changed to ({newDrive})")
         if (newDrive != static_NoDrives):
-            RunFrogTool(console)
+            RunFrogTool(newDrive,console)
 
     def combobox_console_change(self):
         console = self.combobox_console.currentText()
@@ -930,7 +668,7 @@ from tzlion on frogtool. Special thanks also goes to wikkiewikkie & Jason Grieve
         # ERIC: We shouldnt run frogtool as soon as the drive is opened. This is a lot of unnecessary processing.  
         # Jason: agree it takes processing, but there were some crashing bugs where we got out of sync with the table
         # Jason: and if the user changes anything outside of Tadpole it helps keep in sync.  Pros and cons
-        RunFrogTool(console)
+        RunFrogTool(self.combobox_drive.currentText(),console)
 
     def show_readme(self):
         self.readme_dialog = ReadmeDialog(basedir)
@@ -972,10 +710,253 @@ from tzlion on frogtool. Special thanks also goes to wikkiewikkie & Jason Grieve
             QMessageBox.about(self, "Failure","Firmware was not patched with the battery improvements.  Are you already up to date?")
         UpdateMsgBox.close()
 
+    def viewThumbnail(self, rom_path):
+        self.window_thumbnail = ThumbnailDialog(rom_path)  
+        result = self.window_thumbnail.exec()
+        drive = self.combobox_drive.currentText()
+        system = self.combobox_console.currentText()
+        if result:
+            newLogoFileName = self.window_thumbnail.new_viewer.path
+            print(f"user tried to load image: {newLogoFileName}")
+            if newLogoFileName is None or newLogoFileName == "":
+                print("user cancelled image select")
+                return
+            if tadpole_functions.addThumbnail(rom_path, drive, system, newLogoFileName, True):
+                QMessageBox.about(self, "Change ROM Logo", "ROM thumbnails successfully changed")
+                RunFrogTool(drive,system)
+                return True
+            else:
+                QMessageBox.about(self, "Change ROM Cover", "Unable to convert thumbnail for ROM")
+                RunFrogTool(drive,system)
+                return False
+
+    def formatAndDownloadOSFiles(self):
+            foundSD = False
+            QMessageBox.about(self, "Formatting", "First format your SD card. After pressing OK the partition tool will come up enabling you to format it.\n\n\
+    Format it to with a drive letter and to FAT32.  It may say the drive is in use; that is Normal as Tadpole is looking for it.")
+            try:
+                subprocess.Popen('diskmgmt.msc', shell=True)
+            except:
+                logging.error("Can't run diskpart.  Wrong OS?")
+            qm = QMessageBox()
+            ret = qm.question(self, "Formatting", "Did you finish formatting it to FAT32?  Tadpole will now try to detect it.")
+            if ret == qm.No:
+                QMessageBox.about(self, "Formatting", "Please try formating the SD card and trying again.")
+                return False
+            for drive in psutil.disk_partitions():
+                if not os.path.exists(drive.mountpoint):
+                    logging.info("Formatting prevented {drive} can't be read")
+                    continue
+                dir = os.listdir(drive.mountpoint)
+                #Windows puts in a System inFormation item that is hidden
+                if len(dir) > 1:
+                    logging.info("Formatting prevented {drive} isn't empty")
+                    continue
+                if(drive.mountpoint == f'C:\\'):
+                    logging.info("Formatting prevented, be ultra safe don't let them format C")
+                    continue
+                ret = qm.question(self, "Empty SD card found", "Is the right SD card: " + drive.mountpoint + "?")
+                if ret == qm.Yes:
+                    correct_drive = drive.mountpoint
+                    foundSD = True
+                    logging.info("SD card was formatted and is empty")
+                    break
+                if ret == qm.No:
+                    continue
+            if foundSD == False:
+                QMessageBox.about(self, "Empty SD card not found", "Looks like none of the mounted drives in Windows are empty SD cards. Are you sure you formatted it and it is empty?")
+                return False
+            msgBox = DownloadProgressDialog()
+            msgBox.setText("Downloading Firmware Update.")
+            msgBox.show()
+            tadpole_functions.DownloadOSFiles(correct_drive, msgBox.progress)
+            ret = QMessageBox.question(self, "Try booting",  "Try putting the SD card in the SF2000 and starting it.  Did it work?")
+            if ret == qm.No:
+                QMessageBox.about(self, "Not booting", "Sorry it didn't work; Consult https://github.com/vonmillhausen/sf2000#bootloader-bug or ask for help on Discord https://discord.gg/retrohandhelds.")
+                return False
+            
+            ret = QMessageBox.question(self, "Success",  "Congrats!  Now put the SD card back into the computer.\n\n\
+    If you got into a bad state without patching the bootloader, you should patch it so you can make changes safely.  Do you want to patch the bootloader?")
+            if ret == qm.No:
+                return True
+            self.bootloaderPatch()
+            return True
+
+    def deleteROM(self, rom_path):
+        console = self.combobox_console.currentText()
+        drive = self.combobox_drive.currentData()
+        qm = QMessageBox
+        ret = qm.question(self,'Delete ROM?', "Are you sure you want to delete " + rom_path +" and rebuild the ROM list? " , qm.Yes | qm.No)
+        if ret == qm.Yes:
+            try:
+                if console == 'ARCADE':
+                    arcadeZIPROM = tadpole_functions.extractFileNameFromZFB(rom_path)
+                    arcadeZIPPath = os.path.join(drive, console, 'bin', arcadeZIPROM)
+                    os.remove(arcadeZIPPath)
+                os.remove(rom_path)
+            except Exception:
+                QMessageBox.about(self, "Error","Could not delete file.")
+            RunFrogTool(drive,console)
+        return
+
+    def addToShortcuts(self, rom_path):
+        qm = QMessageBox
+        qm.setText("Time to set the rompath!")
+
+    def BGM_change(self, source=""):
+        # Check the selected drive looks like a Frog card
+        drive = self.combobox_drive.currentText()
+        
+        if not tadpole_functions.checkDriveLooksFroggy(drive):
+            QMessageBox.about(self, "Something doesn't Look Right", "The selected drive doesn't contain critical \
+            SF2000 files. The action you selected has been aborted for your safety.")
+            return
+
+        msg_box = DownloadProgressDialog()
+        msg_box.setText("Downloading background music.")
+        msg_box.show()
+        msg_box.showProgress(25, True)
+
+        if source[0:4] == "http":  # internet-based
+            result = tadpole_functions.changeBackgroundMusic(drive, url=source)
+        else:  # local resource
+            result = tadpole_functions.changeBackgroundMusic(drive, file=source)
+
+        if result:
+            msg_box.close()
+            QMessageBox.about(self, "Success", "Background music changed successfully")
+        else:
+            msg_box.close()
+            QMessageBox.about(self, "Failure", "Something went wrong while trying to change the background music")
+
+    def bootloaderPatch(self):
+        qm = QMessageBox
+        ret = qm.question(self, "Download fix", "Patching the bootloader will require your SD card and that the SF2000 is well charged.  Do you want to download the fix?")
+        if ret == qm.No:
+            return
+        #cleanup previous files
+        drive = self.combobox_drive.currentText()
+        if drive == "N/A":
+            ret = QMessageBox().question(self, "Insert SD Card", "To fix the bootloader, you must have your SD card plugged in as it downloads critical \
+    updates to the SD card to update the bootlaoder.  Do you want to plug it in and try detection agian?")
+            if ret == qm.Yes:
+                self.bootloaderPatch()
+            elif ret == qm.No:
+                QMessageBox().about("Update skipped", "No problem.  Just remember if you change any files on the SD card without the bootlaoder \
+    The SF2000 may not boot.  You can always try this fix again in the Firmware options")
+                logging.info("User skipped bootloader")
+                return
+        bootloaderPatchDir = os.path.join(drive,"/UpdateFirmware/")
+        bootloaderPatchPathFile = os.path.join(drive,"/UpdateFirmware/Firmware.upk")
+        bootloaderChecksum = "eb7a4e9c8aba9f133696d4ea31c1efa50abd85edc1321ce8917becdc98a66927"
+        #Let's delete old stuff if it exits incase they tried this before and failed
+        if Path(bootloaderPatchDir).is_dir():
+            shutil.rmtree(bootloaderPatchDir)
+        os.mkdir(bootloaderPatchDir)
+        #Download file, and continue if its successful
+        if tadpole_functions.downloadFileFromGithub(bootloaderPatchPathFile, "https://github.com/EricGoldsteinNz/SF2000_Resources/blob/60659cc783263614c20a60f6e2dd689d319c04f6/OS/Firmware.upk?raw=true"):
+            #check file correctly download
+            with open(bootloaderPatchPathFile, 'rb', buffering=0) as f:
+                downloadedchecksum = hashlib.file_digest(f, 'sha256').hexdigest()
+            #check if the hash matches
+            print("Checking if " + bootloaderChecksum + " matches " + downloadedchecksum)
+            if bootloaderChecksum != downloadedchecksum: # TODO Consider that this may create an infinite loop if the file becomes unavailable or changes
+                QMessageBox().about(self, "Update not successful", "The downloaded file did not download correctly.\n\
+    Tadpole will try the process again. For more help consult https://github.com/vonmillhausen/sf2000#bootloader-bug\n\
+    or ask for help on Discord https://discord.gg/retrohandhelds.")
+                self.bootloaderPatch()
+            ret = QMessageBox().warning(self, "Bootloader Fix", "Downloaded bootloader to SD card.\n\n\
+    You can keep this window open while you appy the fix:\n\
+    1. Eject the SD card from your computer\n\
+    2. Put the SD back in the SF2000)\n\
+    3. Turn the SF2000 on\n\
+    4. You should see a message in the lower-left corner of the screen indicating that patching is taking place.\n\
+    5. The process will only last a few seconds\n\
+    6. You should see the main menu on the SF2000\n\
+    7. Power off the SF2000\n\
+    8. Remove the SD card \n\
+    9. Connect the SD card back to your computer \n\n\
+    Did the update complete successfully?", qm.Yes | qm.No)
+            if Path(bootloaderPatchDir).is_dir():
+                shutil.rmtree(bootloaderPatchDir)
+            if ret == qm.Yes:
+                QMessageBox().about(self, "Update complete", "Your SF2000 should now be safe to use with \
+    Tadpole. Major thanks to osaka#9664 on RetroHandhelds Discords for this fix!\n\n\
+    Remember, you only need to apply the bootloader fix once to your SF2000.  Unlike other changes affecting the SD card, this changes the code running on the SF2000.")
+                logging.info("Bootloader installed correctly...or so the user says")
+                return
+            else:
+                QMessageBox().about(self, "Update not successful", "Based on your answer, the update did not complete successfully.\n\n\
+    Consult https://github.com/vonmillhausen/sf2000#bootloader-bug or ask for help on Discord https://discord.gg/retrohandhelds. ")
+                logging.error("Bootloader failed to install...or so the user says")
+                return
+        else:
+            QMessageBox().about(self, "Download did not complete", "Please ensure you have internet and retry the fix")
+            logging.error("Bootloader failed to download")
+            return
+
+
+    def FixSF2000BootLight(self):
+        drive = self.combobox_drive.currentText()
+        temp_file_bios_path = os.path.join(drive, 'bios', 'file.tmp')
+        qm = QMessageBox
+        ret = qm.question(self, "SF2000 not booting", "If your SF2000 won't boot, you likely hit the bootloader bug or have broken some critical files.  This process attempts to restore your SF2000.\n\n\
+This only works on the Windows OS.\n\nDo you want to continue?")
+        if ret == qm.No:
+            return
+        #create a new file in bios
+        Path.touch(temp_file_bios_path)
+        #delete that file
+        os.remove(temp_file_bios_path)
+        ret = qm.question(self, "Ready to test", "Please take out the SD card and plug it into the SF2000 and turn it on.\n\n\
+Did it boot?")
+        if ret == qm.Yes:
+            QMessageBox.about(self, "Success", "Please apply the bootloader fix now to avoid this issue again.  Sending you there now")
+            self.bootloaderPatch()
+            return
+        if ret == qm.No: 
+            #If no, repeat
+            #create a new file in bios
+            Path.touch(temp_file_bios_path)
+            #delete that file
+            os.remove(temp_file_bios_path)
+            ret = qm.question(self, "Try again", "We attempted one more fix at replacing the bisrv.asd file.  Please take out the SD card now and try one more time\n\n\
+Did it boot this time?")
+            if ret == qm.Yes:
+                QMessageBox.about(self, "Success", "Please apply the bootloader fix now to avoid this issue again.  Sending you there now")
+                self.bootloaderPatch()
+                return
+            if ret == qm.No: 
+                QMessageBox.about(self, "Error", "The simple fix did not succeed.  You need to reformat and install OS files.\n\n\
+Sending you to that option now")
+                self.FixSF2000Boot()
+                return
+    def FixSF2000Boot(self):
+        qm = QMessageBox
+        ret = qm.question(self, "SF2000 not booting", "If your SF2000 won't boot, you likely hit the bootloader bug or have broken some critical files.  This process attempts to restore your SF2000.\n\n\
+This process will delete ALL SAVES AND ROMS, so if you want to save those, cancel out and do so.\n\n\
+This process is only tested on Windows and will not work on Linux/Mac.\n\nDo you want to proceed?")
+        if ret == qm.No:
+            return 
+        #Turn off polling since we are going to mess with the SD card
+        self.turn_off_polling()
+        #Stop access to the drives
+        self.combobox_drive.addItem(QIcon(), static_NoDrives, static_NoDrives)
+        self.status_bar.showMessage("No SF2000 Drive Detected. Please insert SD card and try again.", 20000)
+        self.toggle_features(False)
+        self.formatAndDownloadOSFiles()
+        self.turn_on_polling()
+
+    def turn_off_polling(self):
+        global poll_drives 
+        poll_drives = False
+
+    def turn_on_polling(self):
+        global poll_drives 
+        poll_drives = True
+
     def UpdateDevice(self, url):
         drive = self.combobox_drive.currentText()
-        msgBox = QMessageBox()
-
         msgBox = DownloadProgressDialog()
         msgBox.setText("Downloading Firmware Update.")
         msgBox.show()
@@ -1040,7 +1021,7 @@ from tzlion on frogtool. Special thanks also goes to wikkiewikkie & Jason Grieve
         return status
     
     def rebuildAll(self):
-        RunFrogTool("ALL")
+        RunFrogTool(self.combobox_drive.currentText(),static_AllSystems)
         return
 
     def createSaveBackup(self):
@@ -1113,7 +1094,7 @@ It is recommended to save it somewhere other than your SD card used with the SF2
 Note: You can change in settings to either pick your own or try to downlad automatically.", qm.Yes | qm.No)
             if ret == qm.Yes:
                 self.addBoxart()
-        RunFrogTool(console)
+        RunFrogTool(drive,console)
             
     def validateGameShortcutComboBox(self):
         currentComboBox = self.sender() 
@@ -1162,7 +1143,7 @@ Note: You can change in settings to either pick your own or try to downlad autom
             except Exception:
                 QMessageBox.about(self, "Error","Could not delete ROM.")
         QMessageBox.about(self, "Success",f"Successfully deleted selected ROMs.")
-        RunFrogTool(console)
+        RunFrogTool(drive,console)
 
     def copyUserSelectedDirectoryButton(self):
         source_directory = self.combobox_drive.currentText()
@@ -1172,9 +1153,10 @@ Note: You can change in settings to either pick your own or try to downlad autom
         if ret == qm.No:
             return
         for drive in psutil.disk_partitions():
-            #TODO: should we check if it has more?
-            if os.path.exists(os.path.join(drive.mountpoint, "bios", "bisrv.asd")):
-                #TODO: what happens if we run out of space?
+            # Check that the partition is an Sf2000 SD card
+            if(tadpole_functions.checkDriveLooksFroggy(drive.mountpoint)):
+                # TODO: what happens if we run out of space?
+                # TODO: What happens if we want to write to a drive thats not the first detected froggy drive
                 ret = qm.question(self, "SD Card", "Froggy files found on " + drive.mountpoint + "\n\nAre you sure you want to copy and overwrite all files, including saves?")
                 if ret == qm.No:
                     return              
@@ -1212,6 +1194,7 @@ Note: You can change in settings to either pick your own or try to downlad autom
             self.tbl_gamelist.cellChanged.disconnect(self.catchTableCellChanged)
             self.tbl_gamelist.setRowCount(len(files))
             print(f"Found {len(files)} ROMs")
+            start_time = time.perf_counter()
             #sort the list aphabetically before we go through it
             files = sorted(files)
             for i,game in enumerate(files):
@@ -1244,12 +1227,14 @@ Note: You can change in settings to either pick your own or try to downlad autom
                     if(extension == sys_zxx_ext):
                         with open(pathToROM, "rb") as rom_file:
                             rom_content = bytearray(rom_file.read(((144*208)*2)))
-                        img = QImage(rom_content[0:((144*208)*2)], 144, 208, QImage.Format_RGB16) # The byte array length has been left here as a second safety to ensure we dont try to over read.
+                        
+                        img = QImage(rom_content[0:((144*208)*2)], 144, 208, QImage.Format_RGB16) # The byte array length has been left here as a second safety to ensure we dont try to over read.            
                         pimg = QPixmap()
                         icon = QIcon()
                         QPixmap.convertFromImage(pimg, img)
-                        QIcon.addPixmap(icon, pimg)
-                        cell_viewthumbnail.setIcon(icon)
+                        #QIcon.addPixmap(icon, pimg)
+                        #cell_viewthumbnail.setIcon(icon)
+                        cell_viewthumbnail.setData(Qt.DecorationRole, pimg)
                         cell_viewthumbnail.setFlags(Qt.ItemIsSelectable|Qt.ItemIsEnabled)
                         self.tbl_gamelist.setItem(i, 2, cell_viewthumbnail)
                     else:
@@ -1282,6 +1267,8 @@ Note: You can change in settings to either pick your own or try to downlad autom
                 self.tbl_gamelist.setItem(i, 4, cell_delete)
                 # Update progressbar
                 msgBox.showProgress(i, False)
+            end_time = time.perf_counter()
+            print(f"Image loading time: {end_time - start_time}")
             self.tbl_gamelist.resizeRowsToContents()
             #Restore signals
             self.tbl_gamelist.cellChanged.connect(self.catchTableCellChanged)
@@ -1295,7 +1282,7 @@ Note: You can change in settings to either pick your own or try to downlad autom
         self.tbl_gamelist.show()
 
     def RebuildClicked(self):
-        RunFrogTool(self.combobox_console.currentText())
+        RunFrogTool(self.combobox_drive.currentText(),self.combobox_console.currentText())
         return
             
 if __name__ == "__main__":

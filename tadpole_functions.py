@@ -520,13 +520,7 @@ def getGameShortcutPosition(drive, console, game):
                     return (i - 23)
                 if(console == "ARCADE" ):
                     return (i - 27)
-        return 0
-        #ines[4*systems[console][3]+position] = f"{prefix} {game}*\n"
-        # Save the changes out to file
-    #     xfgle_file_handle = open(xfgle_filepath, "w")
-    #     for line in lines:
-    #         xfgle_file_handle.write(line)
-    #     xfgle_file_handle.close()       
+        return 0      
     except (OSError, IOError):
         print(f"! Failed changing the shortcut file")
         return 0
@@ -547,7 +541,7 @@ def getPrefixFromConsole(console):
     elif console == "GBA":
         return 7
     else:  
-        return 6 #Aracde NEEDS 6
+        return 6 #Aracde NEEDS 6 so always default to that
 
 def findSequence(needle, haystack, offset = 0):
     # Loop through the data array starting from the offset
@@ -576,10 +570,8 @@ This should be used to prevent people from accidentally overwriting their other 
 If the correct files are found it will return True.
 If the correct files are not found it will return False.
 """
-
-
-def checkDriveLooksFroggy(frogypath):
-    bisrvpath = os.path.join(frogypath,"bios","bisrv.asd")
+def checkDriveLooksFroggy(froggypath):
+    bisrvpath = os.path.join(froggypath,"bios","bisrv.asd")
     if os.path.exists(bisrvpath):
         return True
     return False
