@@ -1201,6 +1201,8 @@ Note: You can change in settings to either pick your own or try to downlad autom
             files = sorted(files)
             for i,game in enumerate(files):
                 objGame = sf2000ROM(os.path.join(roms_path, game))
+                if objGame.ROMlocation == '':
+                    continue
                 self.ROMList.append(objGame)
                 humanReadableFileSize = tadpole_functions.getHumanReadableFileSize(objGame.getFileSize())
                 # Filename
