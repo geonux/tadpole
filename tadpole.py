@@ -398,9 +398,6 @@ class MainWindow (QMainWindow):
                 position = position - 1
                 game = self.tbl_gamelist.item(i, 0).text()
                 tadpole_functions.changeGameShortcut(drive, console, position, game)
-    
-
-
 
     """
     Reloads the drive list to check whether there have been any changes
@@ -457,6 +454,7 @@ class MainWindow (QMainWindow):
             RunFrogTool(self.combobox_drive.currentText(), self.combobox_console.currentText())
 
     def detectOSVersion(self):
+        logging.info("Tadpole~DetectOSVersion")
         print("Tadpole~DetectOSVersion: Trying to read bisrv hash")
         drive = self.combobox_drive.currentText()
         msg_box = DownloadProgressDialog()
@@ -610,6 +608,7 @@ the thumbnail for you. ")
 from tzlion on frogtool. Special thanks also goes to wikkiewikkie & Jason Grieves for many amazing improvements")
 
     def GBABIOSFix(self):
+        logging.info("Tadpole~GBABIOSFix")
         drive = self.combobox_drive.currentText()
         try:
             tadpole_functions.GBABIOSFix(drive)
@@ -658,13 +657,13 @@ from tzlion on frogtool. Special thanks also goes to wikkiewikkie & Jason Grieve
     def combobox_drive_change(self):
         newDrive = self.combobox_drive.currentText()
         console = self.combobox_console.currentText()
-        logging.info(f"combobox for drive changed to ({newDrive})")
+        logging.info(f"Combobox for drive changed to ({newDrive})")
         if (newDrive != static_NoDrives):
             RunFrogTool(newDrive,console)
 
     def combobox_console_change(self):
         console = self.combobox_console.currentText()
-        logging.info(f"Dialog for console changed to ({console})")
+        logging.info(f"Combobox for console changed to ({console})")
         # ERIC: We shouldnt run frogtool as soon as the drive is opened. This is a lot of unnecessary processing.  
         # Jason: agree it takes processing, but there were some crashing bugs where we got out of sync with the table
         # Jason: and if the user changes anything outside of Tadpole it helps keep in sync.  Pros and cons
@@ -675,14 +674,17 @@ from tzlion on frogtool. Special thanks also goes to wikkiewikkie & Jason Grieve
         self.readme_dialog.show()
 
     def UpdatetoV1_5(self):
+        logging.info("Tadpole~UpdatetoV1_5")
         url = "https://api.github.com/repos/EricGoldsteinNz/SF2000_Resources/contents/OS/V1.5"
         self.UpdateDevice(url)
     
     def Updateto20230803(self):
+        logging.info("Tadpole~Updateto20230803")
         url = "https://api.github.com/repos/EricGoldsteinNz/SF2000_Resources/contents/OS/20230803"
         self.UpdateDevice(url)
 
     def Battery_fix(self):
+        logging.info("Tadpole~Battery_fix")
         qm = QMessageBox()
         ret = qm.question(self,'Patch Firmware?', "Are you sure you want to patch the firmware? The system will also check if the latest firmware is on the SD card, so make sure you are up to date." , qm.Yes | qm.No)
         if ret == qm.No:
@@ -711,6 +713,7 @@ from tzlion on frogtool. Special thanks also goes to wikkiewikkie & Jason Grieve
         UpdateMsgBox.close()
 
     def viewThumbnail(self, rom_path):
+        logging.info(f"Tadpole~viewThumbnail: ({rom_path})")
         self.window_thumbnail = ThumbnailDialog(rom_path)  
         result = self.window_thumbnail.exec()
         drive = self.combobox_drive.currentText()
@@ -731,56 +734,56 @@ from tzlion on frogtool. Special thanks also goes to wikkiewikkie & Jason Grieve
                 return False
 
     def formatAndDownloadOSFiles(self):
-            foundSD = False
-            QMessageBox.about(self, "Formatting", "First format your SD card. After pressing OK the partition tool will come up enabling you to format it.\n\n\
+        logging.info(f"Tadpole~viewThumbnail: ({rom_path})")
+        foundSD = False
+        QMessageBox.about(self, "Formatting", "First format your SD card. After pressing OK the partition tool will come up enabling you to format it.\n\n\
     Format it to with a drive letter and to FAT32.  It may say the drive is in use; that is Normal as Tadpole is looking for it.")
-            try:
-                subprocess.Popen('diskmgmt.msc', shell=True)
-            except:
-                logging.error("Can't run diskpart.  Wrong OS?")
-            qm = QMessageBox()
-            ret = qm.question(self, "Formatting", "Did you finish formatting it to FAT32?  Tadpole will now try to detect it.")
+        try:
+            subprocess.Popen('diskmgmt.msc', shell=True)
+        except:
+            logging.error("Can't run diskpart.  Wrong OS?")
+        qm = QMessageBox()
+        ret = qm.question(self, "Formatting", "Did you finish formatting it to FAT32?  Tadpole will now try to detect it.")
+        if ret == qm.No:
+            QMessageBox.about(self, "Formatting", "Please try formating the SD card and trying again.")
+            return False
+        for drive in psutil.disk_partitions():
+            if not os.path.exists(drive.mountpoint):
+                logging.info("Formatting prevented {drive} can't be read")
+                continue
+            dir = os.listdir(drive.mountpoint)
+            #Windows puts in a System inFormation item that is hidden
+            if len(dir) > 1:
+                logging.info("Formatting prevented {drive} isn't empty")
+                continue
+            if(drive.mountpoint == f'C:\\'):
+                logging.info("Formatting prevented, be ultra safe don't let them format C")
+                continue
+            ret = qm.question(self, "Empty SD card found", "Is the right SD card: " + drive.mountpoint + "?")
+            if ret == qm.Yes:
+                correct_drive = drive.mountpoint
+                foundSD = True
+                logging.info("SD card was formatted and is empty")
+                break
             if ret == qm.No:
-                QMessageBox.about(self, "Formatting", "Please try formating the SD card and trying again.")
-                return False
-            for drive in psutil.disk_partitions():
-                if not os.path.exists(drive.mountpoint):
-                    logging.info("Formatting prevented {drive} can't be read")
-                    continue
-                dir = os.listdir(drive.mountpoint)
-                #Windows puts in a System inFormation item that is hidden
-                if len(dir) > 1:
-                    logging.info("Formatting prevented {drive} isn't empty")
-                    continue
-                if(drive.mountpoint == f'C:\\'):
-                    logging.info("Formatting prevented, be ultra safe don't let them format C")
-                    continue
-                ret = qm.question(self, "Empty SD card found", "Is the right SD card: " + drive.mountpoint + "?")
-                if ret == qm.Yes:
-                    correct_drive = drive.mountpoint
-                    foundSD = True
-                    logging.info("SD card was formatted and is empty")
-                    break
-                if ret == qm.No:
-                    continue
-            if foundSD == False:
-                QMessageBox.about(self, "Empty SD card not found", "Looks like none of the mounted drives in Windows are empty SD cards. Are you sure you formatted it and it is empty?")
-                return False
-            msgBox = DownloadProgressDialog()
-            msgBox.setText("Downloading Firmware Update.")
-            msgBox.show()
-            tadpole_functions.DownloadOSFiles(correct_drive, msgBox.progress)
-            ret = QMessageBox.question(self, "Try booting",  "Try putting the SD card in the SF2000 and starting it.  Did it work?")
-            if ret == qm.No:
-                QMessageBox.about(self, "Not booting", "Sorry it didn't work; Consult https://github.com/vonmillhausen/sf2000#bootloader-bug or ask for help on Discord https://discord.gg/retrohandhelds.")
-                return False
-            
-            ret = QMessageBox.question(self, "Success",  "Congrats!  Now put the SD card back into the computer.\n\n\
+                continue
+        if foundSD == False:
+            QMessageBox.about(self, "Empty SD card not found", "Looks like none of the mounted drives in Windows are empty SD cards. Are you sure you formatted it and it is empty?")
+            return False
+        msgBox = DownloadProgressDialog()
+        msgBox.setText("Downloading Firmware Update.")
+        msgBox.show()
+        tadpole_functions.DownloadOSFiles(correct_drive, msgBox.progress)
+        ret = QMessageBox.question(self, "Try booting",  "Try putting the SD card in the SF2000 and starting it.  Did it work?")
+        if ret == qm.No:
+            QMessageBox.about(self, "Not booting", "Sorry it didn't work; Consult https://github.com/vonmillhausen/sf2000#bootloader-bug or ask for help on Discord https://discord.gg/retrohandhelds.")
+            return False    
+        ret = QMessageBox.question(self, "Success",  "Congrats!  Now put the SD card back into the computer.\n\n\
     If you got into a bad state without patching the bootloader, you should patch it so you can make changes safely.  Do you want to patch the bootloader?")
-            if ret == qm.No:
-                return True
-            self.bootloaderPatch()
+        if ret == qm.No:
             return True
+        self.bootloaderPatch()
+        return True
 
     def deleteROM(self, rom_path):
         console = self.combobox_console.currentText()
@@ -1193,7 +1196,7 @@ Note: You can change in settings to either pick your own or try to downlad autom
             #Disable signals from firing from these changes
             self.tbl_gamelist.cellChanged.disconnect(self.catchTableCellChanged)
             self.tbl_gamelist.setRowCount(len(files))
-            print(f"Found {len(files)} ROMs")
+            logging.info(f"Found {len(files)} ROMs")
             start_time = time.perf_counter()
             #sort the list aphabetically before we go through it
             files = sorted(files)
