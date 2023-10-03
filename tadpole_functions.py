@@ -980,32 +980,43 @@ def stripShortcutText(drive: str):
 
 def createSaveBackup(drive: str, zip_file_name):
     if drive == "???" or drive == "":
-        raise Exception_InvalidPath
-        
-    #folders = systems.keys
-    #folders.append("ROMS")
-    #for folder in folders:
-        
-    #list(filter(check_save, zip_files))   
+        raise Exception_InvalidPath 
     try:
-        # Create object of ZipFile
         with zipfile.ZipFile(zip_file_name, 'w') as zip_object:
-            # Traverse all files in directory
-            for folder_name, sub_folders, file_names in os.walk(drive):
-                for filename in file_names:
-                    # Filter for save files
-                    if check_is_save_file(filename):
-                        print(f"Found save: {folder_name} ; {filename}")
-                        # Create filepath of files in directory
-                        file_path = os.path.join(folder_name, filename)
-                        # Add files to zip file
+            for root, dirs, files in os.walk(drive):
+                for file in files:
+                    if check_is_save_file(file):
+                        print(f"Found save: {file} in {root}")
                         try:
-                            zip_object.write(file_path, os.path.basename(file_path))   
-                        except OSError:
-                            os.utime(file_path, None)
-                            zip_object.write(file_path, os.path.basename(file_path))
+                            zip_object.write(os.path.join(root, file),
+                                os.path.relpath(os.path.join(root, file),
+                                                os.path.join(drive, '..')))
+                        except Exception as e:
+                            print(f"Bad zip file encountered: {os.path.join(root, file)}")
+                            continue
+        # zipf = zipfile.ZipFile('Python.zip', 'w', zipfile.ZIP_DEFLATED)
+        # zipdir('/tmp/', zipf)
+        # zipf.close()
+
+        # # Create object of ZipFile
+        #with zipfile.ZipFile(zip_file_name, 'w') as zip_object:
+        #     # Traverse all files in directory
+        #     for folder_name, sub_folders, file_names in os.walk(drive):
+        #         for filename in file_names:
+        #             # Filter for save files
+        #             if check_is_save_file(filename):
+        #                 print(f"Found save: {folder_name} ; {filename}")
+        #                 # Create filepath of files in directory
+        #                 file_path = os.path.join(folder_name, filename)
+        #                 # Add files to zip file
+        #                 try:
+        #                     zip_object.write(file_path, os.path.basename(file_path))   
+        #                 except OSError:
+        #                     os.utime(file_path, None)
+        #                     zip_object.write(file_path, os.path.basename(file_path))
         return True
     except Exception as e:
+        logging.error({e})
         return False
                      
 def check_is_save_file(filename):
