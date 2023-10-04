@@ -396,8 +396,8 @@ class MainWindow (QMainWindow):
                 position = int(comboBox.currentText())
                 #position is 0 based
                 position = position - 1
-                game = self.tbl_gamelist.item(i, 0).text()
-                tadpole_functions.changeGameShortcut(drive, console, position, game)
+                filename = os.path.basename(self.ROMList[i].ROMlocation)
+                tadpole_functions.changeGameShortcut(drive, console, position, filename)
 
     """
     Reloads the drive list to check whether there have been any changes
