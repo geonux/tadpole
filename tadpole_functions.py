@@ -437,7 +437,7 @@ def changeGameShortcut(drive, console, position, game):
             #Arcade is special as its location is embedded in the ZFB
             #so we need to go get it
             #Regression fix: we must pass in the zfb as that is the path
-            game = game + '.zfb'
+            #game = game + '.zfb'
             ROM_path = os.path.join(drive, console, game)
             game = extractFileNameFromZFB(ROM_path)
         # Overwrite the one line we want to change
@@ -846,10 +846,10 @@ def extractFileNameFromZFB(romFilePath):
                 i += 1
             #rom_content = bytearray(rom_file.read(907))
             fileName = rom_name_content.decode()
-            logging.info(fileName + 'decoded from RAW')
+            logging.info(f"({fileName}) decoded from ZFB")
             return fileName
     except Exception as e:
-        logging.error(romFilePath +  'not found')
+        logging.error(f"tadpole_functions~extractFileNameFromZFB: error {str(e)}")
         return ''
 
 #Thanks DTeyn for the code!: https://github.com/Dteyn/ZFBTool/blob/master/ZFBTool.pyw
@@ -907,13 +907,13 @@ def deleteROM(ROMfilePath):
         try:
             os.remove(os.path.join(base,"bin",arcadezip))
         except:
-            logging.error("ERROR: tadpole_functions~deleteROM: failed to delete arcadezip ({arcadezip})")
+            logging.error(f"ERROR: tadpole_functions~deleteROM: failed to delete arcadezip ({arcadezip})")
             # We dont return False here because the main point is to delete the provided ROMfilePath file
     # Delete the zxx file
     try:
         os.remove(ROMfilePath)
     except:
-        logging.error("ERROR: tadpole_functions~deleteROM: failed to delete provided ROM file ({ROMfilePath})") 
+        logging.error(f"ERROR: tadpole_functions~deleteROM: failed to delete provided ROM file ({ROMfilePath})") 
         return False   
     return True          
           
