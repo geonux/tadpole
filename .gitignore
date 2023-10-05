@@ -5,3 +5,4 @@ dist
 venv
 frogtool.spec
 tadpole.log
+*.spec
