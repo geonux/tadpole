@@ -898,7 +898,7 @@ def createZFBFile(drive, pngPath, romPath):
         return False
 
 def deleteROM(ROMfilePath):
-    print(f"Tadpole_functions~ Deleting ROM: {ROMfilePath}")
+    logging.info(f"Tadpole_functions~ Deleting ROM: {ROMfilePath}")
     ext = os.path.splitext(ROMfilePath)[1]   
     if(ext == ".zfb"): #ROM is arcade, need to also delete the zip file in bin
         print("Arcade ROM")
@@ -907,7 +907,7 @@ def deleteROM(ROMfilePath):
         try:
             os.remove(os.path.join(base,"bin",arcadezip))
         except:
-            logging.error(f"ERROR: tadpole_functions~deleteROM: failed to delete arcadezip ({arcadezip})")
+            logging.error(f"ERROR: tadpole_functions~deleteROM: failed to delete arcadezip ({ROMfilePath})")
             # We dont return False here because the main point is to delete the provided ROMfilePath file
     # Delete the zxx file
     try:

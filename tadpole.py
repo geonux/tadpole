@@ -173,7 +173,7 @@ class MainWindow (QMainWindow):
         self.btn_delete_roms = QPushButton("Delete selcted ROMs...")
         self.btn_delete_roms.setEnabled(False)
         selector_layout.addWidget(self.btn_delete_roms)
-        self.btn_delete_roms.clicked.connect(self.deleteROMs)
+        self.btn_delete_roms.clicked.connect(self.deleteAllSelectedROMs)
 
         # Game Table Widget
         self.tbl_gamelist = QTableWidget()
@@ -336,7 +336,7 @@ class MainWindow (QMainWindow):
         self.menu_roms.addAction(BackupAllSaves_action)     
         # Help Menu
         self.menu_help = self.menuBar().addMenu("&Help")
-        action_sf2000_boot_light  = QAction(QIcon(self.style().standardIcon(QStyle.StandardPixmap.SP_DialogSaveButton)), "Fix SF2000 not booting - Attemps to fix only the firmaware file (bisrv.asd) ", self, triggered=self.FixSF2000BootLight)                                                                              
+        action_sf2000_boot_light  = QAction(QIcon(self.style().standardIcon(QStyle.StandardPixmap.SP_DialogSaveButton)), "Fix SF2000 not booting - Attempts to fix only the firmware file (bisrv.asd) ", self, triggered=self.FixSF2000BootLight)                                                                              
         self.menu_help.addAction(action_sf2000_boot_light)
         action_sf2000_boot  = QAction(QIcon(self.style().standardIcon(QStyle.StandardPixmap.SP_DialogSaveButton)), "Fix SF2000 not booting - Reformats SD card and reinstalls all OS files", self, triggered=self.FixSF2000Boot)                                                                              
         self.menu_help.addAction(action_sf2000_boot)
@@ -792,11 +792,6 @@ from tzlion on frogtool. Special thanks also goes to wikkiewikkie & Jason Grieve
         if ret == qm.Yes:
             try:
                 tadpole_functions.deleteROM(rom_path)
-                #if console == 'ARCADE':
-                #    arcadeZIPROM = tadpole_functions.extractFileNameFromZFB(rom_path)
-                #    arcadeZIPPath = os.path.join(drive, console, 'bin', arcadeZIPROM)
-                #    os.remove(arcadeZIPPath)
-                #os.remove(rom_path)
             except Exception:
                 QMessageBox.about(self, "Error","Could not delete file.")
             RunFrogTool(drive,console)
@@ -1128,8 +1123,10 @@ Note: You can change in settings to either pick your own or try to downlad autom
         if os.path.exists('currentBackground.temp.png'):
             os.remove('currentBackground.temp.png')
 
-    # TODO this should call the existing delete function rather than doubling up
-    def deleteROMs(self):       
+    """
+    Action function to find all selected ROMs and delete them, then runfrogtool and reload the table
+    """
+    def deleteAllSelectedROMs(self):       
         drive = self.combobox_drive.currentText()
         console = self.combobox_console.currentText()
         qm = QMessageBox
@@ -1141,17 +1138,12 @@ Note: You can change in settings to either pick your own or try to downlad autom
             try:
                 objGame = self.ROMList[item.row()]
                 result = tadpole_functions.deleteROM(objGame.ROMlocation)
-                #if console == 'ARCADE':
-                #    arcadeZIPROM = tadpole_functions.extractFileNameFromZFB(objGame.ROMlocation)
-                #    arcadeZIPPath = os.path.join(drive, console, 'bin', arcadeZIPROM)
-                #    os.remove(arcadeZIPPath)
-                #os.remove(objGame.ROMlocation)
             except Exception:
                 result = False
         if result: 
-            QMessageBox.about(self, "Success",f"Successfully deleted selected ROMs.")
+            QMessageBox.about(self, "Success",f"Successfully deleted all selected ROMs.")
         else:
-            QMessageBox.about(self, "Error","Could not delete ROM.")
+            QMessageBox.about(self, "Error","An error occurred while trying to delete the ROMs. PLease check the log file.")
         RunFrogTool(drive,console)
 
     def copyUserSelectedDirectoryButton(self):
