@@ -428,9 +428,13 @@ def changeGameShortcut(drive, console, position, game):
     try:
         #Read in all the existing shortcuts from file
         xfgle_filepath = os.path.join(drive, "Resources", "xfgle.hgp")
-        xfgle_file_handle = open(xfgle_filepath, "r")
+        xfgle_file_handle = open(xfgle_filepath, "r", encoding="utf-8")
         lines = xfgle_file_handle.readlines()
         xfgle_file_handle.close()
+        # Check that xfgle had the correct number of lines, if it didnt we will need to fix it.
+        if lines == 0:
+            raise IOError
+
         prefix = getPrefixFromConsole(console)
         # Bug fix: Arcade shortcuts point to the ZIP file not the zfb file
         if console == 'ARCADE':
@@ -443,12 +447,12 @@ def changeGameShortcut(drive, console, position, game):
         # Overwrite the one line we want to change
         lines[4*systems[console][3]+position] = f"{prefix} {game}*\n"
         # Save the changes out to file
-        xfgle_file_handle = open(xfgle_filepath, "w")
+        xfgle_file_handle = open(xfgle_filepath, "w", encoding="utf-8")
         for line in lines:
             xfgle_file_handle.write(line)
         xfgle_file_handle.close()       
-    except (OSError, IOError):
-        print(f"! Failed changing the shortcut file")
+    except (OSError, IOError) as e:
+        logging.error(f"Tadpole_functions~changeGameShortcut: Failed changing the shortcut file. {str(e)}")
         return False
   
     return -1
