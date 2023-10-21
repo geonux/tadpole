@@ -234,6 +234,8 @@ class MainWindow (QMainWindow):
         self.menu_os.menu_update = self.menu_os.addMenu("Firmware")
         action_detectOSVersion = QAction(QIcon(self.style().standardIcon(QStyle.StandardPixmap.SP_DialogSaveButton)), "Detect and update firmware", self, triggered=self.detectOSVersion)
         self.menu_os.menu_update.addAction(action_detectOSVersion)
+        action_updateToV1_71  = QAction(QIcon(self.style().standardIcon(QStyle.StandardPixmap.SP_DialogSaveButton)), "Manually change to 2023.10.13 (V1.71)", self, triggered=self.UpdatetoV1_71)                                                                              
+        self.menu_os.menu_update.addAction(action_updateToV1_71)   
         action_updateTo20230803  = QAction(QIcon(self.style().standardIcon(QStyle.StandardPixmap.SP_DialogSaveButton)), "Manually change to 2023.08.03 (V1.6)", self, triggered=self.Updateto20230803)                                                                              
         self.menu_os.menu_update.addAction(action_updateTo20230803)   
         self.action_updateToV1_5  = QAction(QIcon(self.style().standardIcon(QStyle.StandardPixmap.SP_DialogSaveButton)), "Manually change to 2023.04.20 (V1.5)  - Not recommended", self, triggered=self.UpdatetoV1_5)                                                                              
@@ -465,28 +467,24 @@ class MainWindow (QMainWindow):
             detectedVersion = tadpole_functions.bisrv_getFirmwareVersion(os.path.join(drive,"bios","bisrv.asd"))
             if not detectedVersion:
                 detectedVersion = "Version Not Found"
+                return False
             #TODO: move this from string base to something else...or at lesat make sure this gets updated when/if new firmware gets out there
-            if detectedVersion == "2023.04.20 (V1.5)":
-                msg_box.close()
-                qm = QMessageBox
-                ret = qm.question(self,"Detected OS Version", f"Detected version: "+ detectedVersion + "\nDo you want to update to the latest firmware?" , qm.Yes | qm.No)
-                if ret == qm.Yes:
-                    self.Updateto20230803()
-                else:
-                    return False
-            elif detectedVersion == "2023.08.03 (V1.6)":
+            elif detectedVersion == "2023.10.13 (V1.71)":
                 msg_box.close()
                 QMessageBox.about(self, "Detected OS Version", f"You are already on the latest firmware: {detectedVersion}")
                 return True
             else:
                 msg_box.close()
-                QMessageBox.about(self, "Detected OS Version", f"Cannot update from: {detectedVersion}")
-                return True
-
+                qm = QMessageBox
+                ret = qm.question(self,"Detected OS Version", f"Detected version: "+ detectedVersion + "\nDo you want to update to the latest firmware?" , qm.Yes | qm.No)
+                if ret == qm.Yes:
+                    self.UpdatetoV1_71()
+                else:
+                    return False
         except Exception as e:
             msg_box.close()
             logging.error("tadpole~detectOSVersion: Error occured while trying to find OS Version" + str(e))
-            return
+            return False
     
     def addBoxart(self):
         drive = self.combobox_drive.currentText()
@@ -681,6 +679,11 @@ from tzlion on frogtool. Special thanks also goes to wikkiewikkie & Jason Grieve
     def Updateto20230803(self):
         logging.info("Tadpole~Updateto20230803")
         url = "https://api.github.com/repos/EricGoldsteinNz/SF2000_Resources/contents/OS/20230803"
+        self.UpdateDevice(url)
+
+    def UpdatetoV1_71(self):
+        logging.info("Tadpole~UpdateV1_71")
+        url = "https://api.github.com/repos/EricGoldsteinNz/SF2000_Resources/contents/OS/V1.71"
         self.UpdateDevice(url)
 
     def Battery_fix(self):

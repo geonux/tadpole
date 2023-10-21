@@ -40,8 +40,10 @@ supported_save_ext = [
 
 # hash, versionName
 versionDictionary = {
-    "1cd37343576a6584565884fcbbe2ffaf18b50466144b356aa0b885cd9cf10484": "2023.04.20 (V1.5)",
-    "334c8f0a8584db07078d7dfc940e540e6538dde948cb6fdbf50754e4e113d6bc": "2023.08.03 (V1.6)"
+    "151d5eeac148cbede3acba28823c65a34369d31b61c54bdd8ad049767d1c3697": "2023.04.20 (V1.5)",
+    "5335860d13214484eeb1260db8fe322efc87983b425ac5a5f8b0fcdf9588f40a": "2023.08.03 (V1.6)",
+    "b88458bf2c25d3a34ab57ee149f36cfdc6b8a5138d5c6ed147fbea008b4659db": "2023.10.07 (V1.7)",
+    "08bd07ab3313e3f00b922538516a61b5846cde34c74ebc0020cd1a0b557dd54b": "2023.10.13 (V1.71)"
 }
 
 ROMART_baseURL = "https://raw.githubusercontent.com/EricGoldsteinNz/libretro-thumbnails/master/"
@@ -383,10 +385,34 @@ def bisrv_getFirmwareVersion(index_path):
                 bisrv_content[0x35658C] = 0x00
                 bisrv_content[0x356594] = 0x00
                 bisrv_content[0x3565B0] = 0x00
+
+            elif powerCurveFirstByteLocation == 0x356638:
+                #Seems to match October 7th/13th layout...
+                bisrv_content[0x356638] = 0x00
+                bisrv_content[0x356640] = 0x00
+                bisrv_content[0x3566D8] = 0x00
+                bisrv_content[0x3566E0] = 0x00
+                bisrv_content[0x3566FC] = 0x00          
             else:
                 return False
         else:
             return False
+        
+        # Next we'll look for and zero out the bytes used for SNES audio rate and
+        # CPU cycles, in case folks want to patch those bytes to correct SNES
+        # first-launch issues on newer firmwares...
+        # Location: Approximately 0xC0A170 (about 99% of the way through the file)
+        preSNESBytes = findSequence([0x00, 0x00, 0x00, 0x80, 0x00, 0x00, 0x00, 0x80], bisrv_content)
+        if preSNESBytes > -1:
+            snesAudioBitrateBytes = preSNESBytes + 8
+            snesCPUCyclesBytes = snesAudioBitrateBytes + 8
+            bisrv_content[snesAudioBitrateBytes] = 0x00
+            bisrv_content[snesAudioBitrateBytes + 1] = 0x00
+            bisrv_content[snesCPUCyclesBytes] = 0x00
+            bisrv_content[snesCPUCyclesBytes + 1] = 0x00
+        else:
+            return False
+
         # If we're here, we've zeroed-out all of the bits of the firmware that are
         # semi-user modifiable (boot logo, button mappings and the CRC32 bits); now
         # we can generate a hash of what's left and compare it against some known
