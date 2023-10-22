@@ -234,14 +234,16 @@ class MainWindow (QMainWindow):
         self.menu_os.menu_update = self.menu_os.addMenu("Firmware")
         action_detectOSVersion = QAction(QIcon(self.style().standardIcon(QStyle.StandardPixmap.SP_DialogSaveButton)), "Detect and update firmware", self, triggered=self.detectOSVersion)
         self.menu_os.menu_update.addAction(action_detectOSVersion)
+        action_updateToV1_71  = QAction(QIcon(self.style().standardIcon(QStyle.StandardPixmap.SP_DialogSaveButton)), "Manually change to 2023.10.13 (V1.71)", self, triggered=self.UpdatetoV1_71)                                                                              
+        self.menu_os.menu_update.addAction(action_updateToV1_71)   
         action_updateTo20230803  = QAction(QIcon(self.style().standardIcon(QStyle.StandardPixmap.SP_DialogSaveButton)), "Manually change to 2023.08.03 (V1.6)", self, triggered=self.Updateto20230803)                                                                              
         self.menu_os.menu_update.addAction(action_updateTo20230803)   
         self.action_updateToV1_5  = QAction(QIcon(self.style().standardIcon(QStyle.StandardPixmap.SP_DialogSaveButton)), "Manually change to 2023.04.20 (V1.5)  - Not recommended", self, triggered=self.UpdatetoV1_5)                                                                              
         self.menu_os.menu_update.addAction(self.action_updateToV1_5)
         self.menu_os.menu_update.addSeparator()
-        action_battery_fix  = QAction(QIcon(self.style().standardIcon(QStyle.StandardPixmap.SP_DialogSaveButton)), "Battery Fix - Built by commnity (Improves battery life & shows low power warning)", self, triggered=self.Battery_fix)                                                                              
+        action_battery_fix  = QAction(QIcon(self.style().standardIcon(QStyle.StandardPixmap.SP_DialogSaveButton)), "Battery Fix - Built by the community (Improves battery life and shows low power warning)", self, triggered=self.Battery_fix)                                                                              
         self.menu_os.menu_update.addAction(action_battery_fix)
-        action_bootloader_patch  = QAction(QIcon(self.style().standardIcon(QStyle.StandardPixmap.SP_DialogSaveButton)), "Bootloader Fix - Built by commnity (Prevents device from not booting and corrupting SD card when changing files on SD card)", self, triggered=self.bootloaderPatch)                                                                              
+        action_bootloader_patch  = QAction(QIcon(self.style().standardIcon(QStyle.StandardPixmap.SP_DialogSaveButton)), "Bootloader Fix - Built by the community (Prevents device from not booting and corrupting SD card when changing files on SD card)", self, triggered=self.bootloaderPatch)                                                                              
         self.menu_os.menu_update.addAction(action_bootloader_patch)   
         #Sub-menu for updating themes
         self.menu_os.menu_change_theme = self.menu_os.addMenu("Theme")
@@ -465,28 +467,24 @@ class MainWindow (QMainWindow):
             detectedVersion = tadpole_functions.bisrv_getFirmwareVersion(os.path.join(drive,"bios","bisrv.asd"))
             if not detectedVersion:
                 detectedVersion = "Version Not Found"
+                return False
             #TODO: move this from string base to something else...or at lesat make sure this gets updated when/if new firmware gets out there
-            if detectedVersion == "2023.04.20 (V1.5)":
-                msg_box.close()
-                qm = QMessageBox
-                ret = qm.question(self,"Detected OS Version", f"Detected version: "+ detectedVersion + "\nDo you want to update to the latest firmware?" , qm.Yes | qm.No)
-                if ret == qm.Yes:
-                    self.Updateto20230803()
-                else:
-                    return False
-            elif detectedVersion == "2023.08.03 (V1.6)":
+            elif detectedVersion == "2023.10.13 (V1.71)":
                 msg_box.close()
                 QMessageBox.about(self, "Detected OS Version", f"You are already on the latest firmware: {detectedVersion}")
                 return True
             else:
                 msg_box.close()
-                QMessageBox.about(self, "Detected OS Version", f"Cannot update from: {detectedVersion}")
-                return True
-
+                qm = QMessageBox
+                ret = qm.question(self,"Detected OS Version", f"Detected version: "+ detectedVersion + "\nDo you want to update to the latest firmware?" , qm.Yes | qm.No)
+                if ret == qm.Yes:
+                    self.UpdatetoV1_71()
+                else:
+                    return False
         except Exception as e:
             msg_box.close()
             logging.error("tadpole~detectOSVersion: Error occured while trying to find OS Version" + str(e))
-            return
+            return False
     
     def addBoxart(self):
         drive = self.combobox_drive.currentText()
@@ -683,6 +681,11 @@ from tzlion on frogtool. Special thanks also goes to wikkiewikkie & Jason Grieve
         url = "https://api.github.com/repos/EricGoldsteinNz/SF2000_Resources/contents/OS/20230803"
         self.UpdateDevice(url)
 
+    def UpdatetoV1_71(self):
+        logging.info("Tadpole~UpdateV1_71")
+        url = "https://api.github.com/repos/EricGoldsteinNz/SF2000_Resources/contents/OS/V1.71"
+        self.UpdateDevice(url)
+
     def Battery_fix(self):
         logging.info("Tadpole~Battery_fix")
         qm = QMessageBox()
@@ -864,7 +867,7 @@ from tzlion on frogtool. Special thanks also goes to wikkiewikkie & Jason Grieve
     or ask for help on Discord https://discord.gg/retrohandhelds.")
                 self.bootloaderPatch()
             ret = QMessageBox().warning(self, "Bootloader Fix", "Downloaded bootloader to SD card.\n\n\
-    You can keep this window open while you appy the fix:\n\
+    You can keep this window open while you apply the fix:\n\
     1. Eject the SD card from your computer\n\
     2. Put the SD back in the SF2000)\n\
     3. Turn the SF2000 on\n\
