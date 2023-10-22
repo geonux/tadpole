@@ -38,12 +38,16 @@ supported_save_ext = [
     "sav", "sa0", "sa1", "sa2", "sa3"
 ] 
 
+version_displayString_1_5 = "2023.04.20 (V1.5)"
+version_displayString_1_6 = "2023.08.03 (V1.6)"
+version_displayString_1_7 = "2023.10.07 (V1.7)"
+version_displayString_1_71 ="2023.10.13 (V1.71)"
 # hash, versionName
 versionDictionary = {
-    "151d5eeac148cbede3acba28823c65a34369d31b61c54bdd8ad049767d1c3697": "2023.04.20 (V1.5)",
-    "5335860d13214484eeb1260db8fe322efc87983b425ac5a5f8b0fcdf9588f40a": "2023.08.03 (V1.6)",
-    "b88458bf2c25d3a34ab57ee149f36cfdc6b8a5138d5c6ed147fbea008b4659db": "2023.10.07 (V1.7)",
-    "08bd07ab3313e3f00b922538516a61b5846cde34c74ebc0020cd1a0b557dd54b": "2023.10.13 (V1.71)"
+    "151d5eeac148cbede3acba28823c65a34369d31b61c54bdd8ad049767d1c3697": version_displayString_1_5,
+    "5335860d13214484eeb1260db8fe322efc87983b425ac5a5f8b0fcdf9588f40a": version_displayString_1_6,
+    "b88458bf2c25d3a34ab57ee149f36cfdc6b8a5138d5c6ed147fbea008b4659db": version_displayString_1_7,
+    "08bd07ab3313e3f00b922538516a61b5846cde34c74ebc0020cd1a0b557dd54b": version_displayString_1_71
 }
 
 ROMART_baseURL = "https://raw.githubusercontent.com/EricGoldsteinNz/libretro-thumbnails/master/"
@@ -92,7 +96,7 @@ def changeBootLogo(index_path, newLogoFileName, msgBox):
     file_handle = open(index_path, 'rb')  # rb for read, wb for write
     bisrv_content = bytearray(file_handle.read(os.path.getsize(index_path)))
     file_handle.close()
-    logoOffset = findSequence(offset_logo_presequence, bisrv_content)
+    logoOffset = findSequence(offset_logo_presequence, bisrv_content,10000000)
     bootLogoStart = logoOffset + 16
     
     for i in range(0, 512*200):
@@ -316,8 +320,8 @@ def bisrv_getFirmwareVersion(index_path):
         
         # Next identify the boot logo position, and blank it out too...
         print("start finding logo")
-        badExceptionOffset = findSequence(offset_logo_presequence, bisrv_content)
-        print("finished finding logo")
+        badExceptionOffset = findSequence(offset_logo_presequence, bisrv_content, 10000000) #Set the offset to 10000000 as we know it doesnt occur earlier than that
+        print(f"finished finding logo - ({badExceptionOffset})")
         if (badExceptionOffset > -1):  # Check we found the boot logo position
             bootLogoStart = badExceptionOffset + 16
             for i in range(bootLogoStart, bootLogoStart + 204800):
@@ -326,9 +330,10 @@ def bisrv_getFirmwareVersion(index_path):
             return False
         
         print("Blanked Bootlogo")
-        
+        print("start finding button mapping")
         # Next identify the emulator button mappings (if they exist), and blank them out too...
-        preButtonMapOffset = findSequence(offset_buttonMap_presequence, bisrv_content)
+        preButtonMapOffset = findSequence(offset_buttonMap_presequence, bisrv_content, 9200000)
+        print(f"found button mapping - ({preButtonMapOffset})")
         if preButtonMapOffset > -1:
             postButtonMapOffset = findSequence(offset_buttonMap_postsequence, bisrv_content, preButtonMapOffset)
             if postButtonMapOffset > -1:
@@ -338,12 +343,14 @@ def bisrv_getFirmwareVersion(index_path):
                 return False
         else:
             return False
-        
+        print("finished finding button mapping")
         # Next we'll look for (and zero out) the five bytes that the power
         # monitoring functions of the SF2000 use for switching the UI's battery
         # level indicator. These unfortunately can't be searched for - they're just
         # in specific known locations for specific firmware versions...
-        prePowerCurve = findSequence([0x11, 0x05, 0x00, 0x02, 0x24], bisrv_content)
+        print("start finding powercurve")
+        prePowerCurve = findSequence([0x11, 0x05, 0x00, 0x02, 0x24], bisrv_content,3000000)
+        print(f"found pre-powercurve - ({prePowerCurve})")
         if prePowerCurve > -1:
             powerCurveFirstByteLocation = prePowerCurve + 5
             if powerCurveFirstByteLocation == 0x35A8F8:
@@ -402,7 +409,8 @@ def bisrv_getFirmwareVersion(index_path):
         # CPU cycles, in case folks want to patch those bytes to correct SNES
         # first-launch issues on newer firmwares...
         # Location: Approximately 0xC0A170 (about 99% of the way through the file)
-        preSNESBytes = findSequence([0x00, 0x00, 0x00, 0x80, 0x00, 0x00, 0x00, 0x80], bisrv_content)
+        preSNESBytes = findSequence([0x00, 0x00, 0x00, 0x80, 0x00, 0x00, 0x00, 0x80], bisrv_content,12500000)
+        print(f"found pre SNES fix bytes - ({preSNESBytes})")
         if preSNESBytes > -1:
             snesAudioBitrateBytes = preSNESBytes + 8
             snesCPUCyclesBytes = snesAudioBitrateBytes + 8
@@ -575,7 +583,7 @@ def getPrefixFromConsole(console):
 
 def findSequence(needle, haystack, offset = 0):
     # Loop through the data array starting from the offset
-    for i in range(len(haystack) - len(needle) + 1):
+    for i in range(len(haystack) - offset - len(needle) + 1):
         readpoint = offset + i
         # Assume a match until proven otherwise
         match = True
@@ -779,7 +787,7 @@ def downloadDirectoryFromGithub(location, url, progressBar):
                 #create folder then recursively download
                 foldername = item["name"]
                 destination = os.path.join(location,foldername)
-                print(f"creating directory {destination}")
+                print(f"creating directory if it doesnt exist {destination}")
                 os.makedirs(destination, exist_ok=True)
                 downloadDirectoryFromGithub(destination, item["url"], progressBar)
             else:# all other cases should be files
@@ -1202,8 +1210,9 @@ def addThumbnail(rom_path, drive, system, new_thumbnail, ovewrite):
 #Thanks to Dteyn for putting the python together from here: https://github.com/Dteyn/SF2000_Battery_Level_Patcher/blob/master/main.py
 #Thanks to OpenAI for writing the class and converting logging to prints
 class BatteryPatcher:
-    def __init__(self, firmware_file):
+    def __init__(self, firmware_file, fw_version):
 
+        self.fw_version = fw_version
         # Filename of original firmware file to open
         self.firmware_file = firmware_file
         # Filename of patched firmware file to save
@@ -1219,7 +1228,7 @@ class BatteryPatcher:
         }
 
         # Offset addresses for each battery level - firmware 08.03
-        self.ADDRESSES = [
+        self.ADDRESSES_V1_6 = [
             0x3564ec,  # 5 bars (full charge)
             0x3564f4,  # 4 bars
             0x35658c,  # 3 bars
@@ -1227,9 +1236,14 @@ class BatteryPatcher:
             0x3565b0  # 1 bar (red)
         ]
 
-        # Convert voltage levels to firmware values
-        self.BATTERY_VALUES = {addr: self.voltage_to_value(self.VOLTAGE_LEVELS[bar])
-                               for addr, bar in zip(self.ADDRESSES, self.VOLTAGE_LEVELS)}
+        # Offset addresses for each battery level - firmware v1.71
+        self.ADDRESSES_V1_71 = [
+            0x356638,  # 5 bars (full charge)
+            0x356640,  # 4 bars
+            0x3566d8,  # 3 bars
+            0x3566e0,  # 2 bars (yellow)
+            0x3566fc  # 1 bar (red)
+        ]
 
         # Stock values for sanity check
         self.STOCK_VALUES = [
@@ -1271,7 +1285,6 @@ class BatteryPatcher:
         for i in range(512, len(data)):
             c = (c << 8) ^ tab_crc32[((c >> 24) ^ data[i]) & 0xFF]
             c &= 0xFFFFFFFF
-
         return c
 
     def check_patch_applied(self):
@@ -1279,23 +1292,38 @@ class BatteryPatcher:
             bisrv_data = bytearray(f.read())
             logging.info("File '%s' opened successfully." % self.firmware_file)
         # TODO add error checking
-        for addr, expected_value in zip(self.ADDRESSES, self.BATTERY_FIX_VALUES):
+        ADDRESSES = self.get_ADRESSES()
+        if not ADDRESSES:
+            return False
+        for addr, expected_value in zip(ADDRESSES, self.BATTERY_FIX_VALUES):
             if bisrv_data[addr] != expected_value:
-                print("The firmware does not match the expected battery patched versions at offset %X. "
-                            "Please check the offsets." %addr)
+                logging.info("The firmware does not match the expected battery patched versions at offset %X. ")
                 return False
         logging.info("The firmware matched the expected battery patched versions at offset %X." %addr)
         return True
 
 
+    def get_ADRESSES(self):
+        if (self.fw_version == version_displayString_1_6):
+            return self.ADDRESSES_V1_6
+        elif (self.fw_version == version_displayString_1_71):
+            return self.ADDRESSES_V1_71  
+        else:
+            logging.warn("BatteryPatcher~check_latest_firmware: Firmware version mismatch")
+            return False 
+
     def check_latest_firmware(self):
+        #TODO: Replace this with a proper check
         """
         Check if the firmware matches the patched values
         """
         with open(self.firmware_file, 'rb') as f:
             bisrv_data = bytearray(f.read())
             logging.info("File '%s' opened successfully." % self.firmware_file)
-        for addr, expected_value in zip(self.ADDRESSES, self.STOCK_VALUES):
+        ADDRESSES = self.get_ADRESSES()
+        if not ADDRESSES:
+            return False
+        for addr, expected_value in zip(ADDRESSES, self.STOCK_VALUES):
             if bisrv_data[addr] != expected_value:
                 print("The firmware does not match the expected '08.03' version at offset %X. "
                               "Please check the offsets." %addr)
@@ -1317,7 +1345,12 @@ class BatteryPatcher:
             # Perform sanity check
             if not self.check_latest_firmware():
                 return
-
+            ADDRESSES = self.get_ADRESSES()
+            if not ADDRESSES:
+                return False
+            # Convert voltage levels to firmware values
+            self.BATTERY_VALUES = {addr: self.voltage_to_value(self.VOLTAGE_LEVELS[bar])
+                               for addr, bar in zip(ADDRESSES, self.VOLTAGE_LEVELS)}
             # Patch the battery values
             for addr, value in self.BATTERY_VALUES.items():
                 bisrv_data[addr] = value

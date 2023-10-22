@@ -689,21 +689,22 @@ from tzlion on frogtool. Special thanks also goes to wikkiewikkie & Jason Grieve
     def Battery_fix(self):
         logging.info("Tadpole~Battery_fix")
         qm = QMessageBox()
-        ret = qm.question(self,'Patch Firmware?', "Are you sure you want to patch the firmware? The system will also check if the latest firmware is on the SD card, so make sure you are up to date." , qm.Yes | qm.No)
+        ret = qm.question(self,'Patch Firmware?', "Are you sure you want to patch the firmware? The system will also check if supported firmware is on the SD card, so make sure you are up to date." , qm.Yes | qm.No)
         if ret == qm.No:
             return
-        battery_patcher = tadpole_functions.BatteryPatcher(os.path.join(self.combobox_drive.currentText(),"bios","bisrv.asd"))
+        fw_version = tadpole_functions.bisrv_getFirmwareVersion(os.path.join(self.combobox_drive.currentText(),"bios","bisrv.asd"))
+        battery_patcher = tadpole_functions.BatteryPatcher(os.path.join(self.combobox_drive.currentText(),"bios","bisrv.asd"), fw_version)
         if battery_patcher.check_patch_applied():
             QMessageBox.about(self, "Status","You already have the battery patch applied")
             return
-        #Order matters, if they are on patch, they will fail so do this second
-        elif not battery_patcher.check_latest_firmware():
+        #Patch isnt already applied so lets check that we are on a supported firmware version for the battery patch
+        elif fw_version != tadpole_functions.version_displayString_1_6 and fw_version != tadpole_functions.version_displayString_1_71:
             qm = QMessageBox()
-            ret = qm.question(self,'Status', "This version of tadpole only supports battery patching of v1.6 firmware.  Do you want to downlaod it now?" , qm.Yes | qm.No)
+            ret = qm.question(self,'Status', "This version of tadpole only supports battery patching of v1.6 and v1.71 firmware.  Do you want to downlaod v1.71 now?" , qm.Yes | qm.No)
             if ret == qm.No:
                 return
             else:
-                self.Updateto20230803()
+                self.action_updateToV1_71()
         #get some progress for the user
         UpdateMsgBox = DownloadProgressDialog()
         UpdateMsgBox.setText("Patching firmware...")
