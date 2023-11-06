@@ -7,6 +7,7 @@ import os
 import shutil
 import hashlib
 import zipfile
+from io import BytesIO
 #feature imports
 import struct
 import frogtool
@@ -700,6 +701,7 @@ def changeTheme(drive_path: str, url: str = "", file: str = "", progressBar: QPr
     Raises:
         ValueError: When both url and file params are provided.
     """
+    # TODO do this in memory instead
     if url and not file:
         zip_file = "theme.zip"
         downloadFileFromGithub(zip_file, url)
@@ -817,6 +819,22 @@ def downloadFileFromGithub(outFile, url):
         return False
 
 
+def downloadAndExtractZIP(root, url, progress):
+    try:
+        response = requests.get(url)
+        if response.status_code == 200:
+            
+            zip = zipfile.ZipFile(BytesIO(response.content))
+            zip.extractall(path=root)
+            
+            return True
+        else:
+            print("Error when trying to download a file from Github. Response was not code 200")
+            raise InvalidURLError
+    except Exception as e:
+        print(str(e))
+        return False
+
 def DownloadOSFiles(correct_drive, progress): 
     downloadDirectoryFromGithub(correct_drive,"https://api.github.com/repos/EricGoldsteinNz/SF2000_Resources/contents/OS/V1.6", progress)
     #Make the ROM directories
@@ -846,6 +864,22 @@ def DownloadOSFiles(correct_drive, progress):
     #Jason: Per Dteyn, we need to remove and redownlaod bisrv.asd to clear the known bug bootloader crash
     downloadFileFromGithub(os.path.join(correct_drive,"bios","bisrv.asd"), "https://raw.githubusercontent.com/EricGoldsteinNz/SF2000_Resources/main/OS/V1.6/bios/bisrv.asd")        
     return True
+
+def makeMulticoreROMList(drive):
+    logging.info("tadpole_functions~makeMulticoreROMList")
+    romcount = 0
+    for d in os.listdir(os.path.join(drive,"cores")):
+        if os.path.isdir(os.path.join(drive,"cores",d)):
+            logging.info(f"Build Multicore ROMs for {d}")
+            romfolder = os.path.join(drive,"ROMS",d)
+            if os.path.exists(romfolder):
+                for rom in os.listdir(romfolder):
+                    romcount += 1
+                    # Creates a new file 
+                    with open(os.path.join(drive,"ROMS",f"{d};{rom}.gba"), 'w'): 
+                        pass
+    return romcount
+
 
 def emptyFavourites(drive) -> bool:
     return emptyFile(os.path.join(drive, "Resources", "Favorites.bin"))

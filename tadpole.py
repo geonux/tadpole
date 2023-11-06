@@ -244,7 +244,14 @@ class MainWindow (QMainWindow):
         action_battery_fix  = QAction(QIcon(self.style().standardIcon(QStyle.StandardPixmap.SP_DialogSaveButton)), "Battery Fix - Built by the community (Improves battery life and shows low power warning)", self, triggered=self.Battery_fix)                                                                              
         self.menu_os.menu_update.addAction(action_battery_fix)
         action_bootloader_patch  = QAction(QIcon(self.style().standardIcon(QStyle.StandardPixmap.SP_DialogSaveButton)), "Bootloader Fix - Built by the community (Prevents device from not booting and corrupting SD card when changing files on SD card)", self, triggered=self.bootloaderPatch)                                                                              
-        self.menu_os.menu_update.addAction(action_bootloader_patch)   
+        self.menu_os.menu_update.addAction(action_bootloader_patch)
+        self.menu_os.menu_update.addSeparator()
+        self.menu_os.menu_update_multicore = self.menu_os.menu_update.addMenu("Multicore") 
+        action_updateMulticore006  = QAction(QIcon(self.style().standardIcon(QStyle.StandardPixmap.SP_DialogSaveButton)), "Manually change to Multicore 0.06", self, triggered=self.UpdateMulticore006)                                                                              
+        self.menu_os.menu_update_multicore.addAction(action_updateMulticore006)  
+        self.menu_os.menu_update_multicore.addSeparator()
+        action_makeMulticoreROMList  = QAction(QIcon(self.style().standardIcon(QStyle.StandardPixmap.SP_DialogSaveButton)), "Build Multicore ROM List", self, triggered=self.makeMulticoreROMList)                                                                              
+        self.menu_os.menu_update_multicore.addAction(action_makeMulticoreROMList) 
         #Sub-menu for updating themes
         self.menu_os.menu_change_theme = self.menu_os.addMenu("Theme")
         try:
@@ -686,6 +693,22 @@ from tzlion on frogtool. Special thanks also goes to wikkiewikkie & Jason Grieve
         url = "https://api.github.com/repos/EricGoldsteinNz/SF2000_Resources/contents/OS/V1.71"
         self.UpdateDevice(url)
 
+    def UpdateMulticore006(self):
+        logging.info("Tadpole~UpdateMulticore006")
+        url = "https://github.com/EricGoldsteinNz/SF2000_Resources/raw/main/OS/multicore_alpha_0.06.zip"
+        self.UpdateDeviceFromZip(url)
+
+    def makeMulticoreROMList(self):
+        logging.info("Tadpole~makeMulticoreROMList")
+        drive = self.combobox_drive.currentText()
+        msgBox = DownloadProgressDialog()
+        msgBox.setText("Rebuilding Multicore ROM list.")
+        msgBox.show()
+        msgBox.showProgress(0, True)
+        romcount = tadpole_functions.makeMulticoreROMList(drive)
+        msgBox.close()
+        QMessageBox.about(self, "Finished Rebuilding Multicore ROMs",f"Found {romcount} ROMs in multicore folders")
+    
     def Battery_fix(self):
         logging.info("Tadpole~Battery_fix")
         qm = QMessageBox()
@@ -970,6 +993,21 @@ This process is only tested on Windows and will not work on Linux/Mac.\n\nDo you
             msgBox.close()
             QMessageBox.about(self, "Failure","ERROR: Something went wrong while trying to download the update")
 
+    def UpdateDeviceFromZip(self, url):
+        drive = self.combobox_drive.currentText()
+        msgBox = DownloadProgressDialog()
+        msgBox.setText("Downloading Firmware Update.")
+        msgBox.show()
+        msgBox.showProgress(0, True)
+        if tadpole_functions.downloadAndExtractZIP(drive, url, msgBox.progress):
+            msgBox.close()
+            QMessageBox.about(self, "Success","Update successfully downloaded")
+        else:
+            msgBox.close()
+            QMessageBox.about(self, "Failure","ERROR: Something went wrong while trying to download the update")
+    
+    
+    
     def change_theme(self, url):
         qm = QMessageBox()
         ret = qm.question(self,'Heads up', "Changing themes will ovewrite your game shortcut icons.  You can change them again after the theme is applied.  Are you sure you want to change your theme?" , qm.Yes | qm.No)
