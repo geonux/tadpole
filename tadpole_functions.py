@@ -822,18 +822,18 @@ def downloadFileFromGithub(outFile, url):
 def downloadAndExtractZIP(root, url, progress):
     try:
         response = requests.get(url)
+        logging.info(f"tadpole_functions~downloadAndExtractZIP: Received {response.status_code} for ({url}) with length {len(response.content)}")
         if response.status_code == 200:
-            
+            progress.showProgress(50, True)
             zip = zipfile.ZipFile(BytesIO(response.content))
-            zip.extractall(path=root)
-            
+            zip.extractall(path=root)          
             return True
-        else:
-            print("Error when trying to download a file from Github. Response was not code 200")
+        else: 
+            logging.error("tadpole_functions~downloadAndExtractZIP: Problem when trying to download a file from Github. Response was not code 200")
             raise InvalidURLError
     except Exception as e:
-        print(str(e))
-        return False
+        logging.error(f"tadpole_functions~downloadAndExtractZIP: ERROR {str(e)}")
+    return False
 
 def DownloadOSFiles(correct_drive, progress): 
     downloadDirectoryFromGithub(correct_drive,"https://api.github.com/repos/EricGoldsteinNz/SF2000_Resources/contents/OS/V1.6", progress)

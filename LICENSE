@@ -1,6 +1,7 @@
 MIT License
 
-Copyright (c) 2023 taizou
+Copyright (c) 2023 EricGoldstein
+ROM list building based on code Copyright (c) 2023 taizou
 RGB565 conversion based on code Copyright (c) 2019 jpfwong
 
 Permission is hereby granted, free of charge, to any person obtaining a copy

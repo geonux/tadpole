@@ -1001,9 +1001,11 @@ This process is only tested on Windows and will not work on Linux/Mac.\n\nDo you
         msgBox.showProgress(0, True)
         if tadpole_functions.downloadAndExtractZIP(drive, url, msgBox.progress):
             msgBox.close()
+            logging.info("Tadpole~UpdateDeviceFromZip: Sucessfully downloaded and extracted ({url})")
             QMessageBox.about(self, "Success","Update successfully downloaded")
         else:
             msgBox.close()
+            logging.error("Tadpole~UpdateDeviceFromZip: Failed. downloadAndExtractZIP did not return True.")
             QMessageBox.about(self, "Failure","ERROR: Something went wrong while trying to download the update")
     
     
