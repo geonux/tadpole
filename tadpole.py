@@ -232,26 +232,41 @@ class MainWindow (QMainWindow):
         self.menu_os = self.menuBar().addMenu("&OS")
         #Sub-menu for updating Firmware
         self.menu_os.menu_update = self.menu_os.addMenu("Firmware")
-        action_detectOSVersion = QAction(QIcon(self.style().standardIcon(QStyle.StandardPixmap.SP_DialogSaveButton)), "Detect and update firmware", self, triggered=self.detectOSVersion)
-        self.menu_os.menu_update.addAction(action_detectOSVersion)
-        action_updateToV1_71  = QAction(QIcon(self.style().standardIcon(QStyle.StandardPixmap.SP_DialogSaveButton)), "Manually change to 2023.10.13 (V1.71)", self, triggered=self.UpdatetoV1_71)                                                                              
-        self.menu_os.menu_update.addAction(action_updateToV1_71)   
-        action_updateTo20230803  = QAction(QIcon(self.style().standardIcon(QStyle.StandardPixmap.SP_DialogSaveButton)), "Manually change to 2023.08.03 (V1.6)", self, triggered=self.Updateto20230803)                                                                              
-        self.menu_os.menu_update.addAction(action_updateTo20230803)   
-        self.action_updateToV1_5  = QAction(QIcon(self.style().standardIcon(QStyle.StandardPixmap.SP_DialogSaveButton)), "Manually change to 2023.04.20 (V1.5)  - Not recommended", self, triggered=self.UpdatetoV1_5)                                                                              
-        self.menu_os.menu_update.addAction(self.action_updateToV1_5)
+        # Get firmware from tadpole storage
+        response = requests.get("https://tadpolestorage.blob.core.windows.net/$web/os.json")
+        self.OS_options = {} #This approach means that two items must never have the same name or there will be a collision. 
+        if response.status_code == 200:
+            data = json.loads(response.content)
+            # Read official firmware versions
+            for item in data["official"]["versions"]:
+                title = item["title"]
+                link = item["link"]
+                self.OS_options[title] = link                                                                              
+                self.menu_os.menu_update.addAction(QAction(QIcon(self.style().standardIcon(QStyle.StandardPixmap.SP_DialogSaveButton)), 
+                                                           title, 
+                                                           self, 
+                                                           triggered=self.change_OS))
+            self.menu_os.menu_update.addSeparator()
+            # Read multicore firmware versions
+            for item in data["multicore"]["versions"]:
+                title = item["title"]
+                link = item["link"]
+                self.OS_options[title] = link                                                                              
+                self.menu_os.menu_update.addAction(QAction(QIcon(self.style().standardIcon(QStyle.StandardPixmap.SP_DialogSaveButton)), 
+                                                           title, 
+                                                           self, 
+                                                           triggered=self.change_OS))  
+        action_makeMulticoreROMList  = QAction(QIcon(self.style().standardIcon(QStyle.StandardPixmap.SP_DialogSaveButton)), "Rebuild Multicore ROM List", self, triggered=self.makeMulticoreROMList)                                                                              
+        self.menu_os.menu_update.addAction(action_makeMulticoreROMList) 
         self.menu_os.menu_update.addSeparator()
         action_battery_fix  = QAction(QIcon(self.style().standardIcon(QStyle.StandardPixmap.SP_DialogSaveButton)), "Battery Fix - Built by the community (Improves battery life and shows low power warning)", self, triggered=self.Battery_fix)                                                                              
         self.menu_os.menu_update.addAction(action_battery_fix)
         action_bootloader_patch  = QAction(QIcon(self.style().standardIcon(QStyle.StandardPixmap.SP_DialogSaveButton)), "Bootloader Fix - Built by the community (Prevents device from not booting and corrupting SD card when changing files on SD card)", self, triggered=self.bootloaderPatch)                                                                              
         self.menu_os.menu_update.addAction(action_bootloader_patch)
         self.menu_os.menu_update.addSeparator()
-        self.menu_os.menu_update_multicore = self.menu_os.menu_update.addMenu("Multicore") 
-        action_updateMulticore006  = QAction(QIcon(self.style().standardIcon(QStyle.StandardPixmap.SP_DialogSaveButton)), "Manually change to Multicore 0.06", self, triggered=self.UpdateMulticore006)                                                                              
-        self.menu_os.menu_update_multicore.addAction(action_updateMulticore006)  
-        self.menu_os.menu_update_multicore.addSeparator()
-        action_makeMulticoreROMList  = QAction(QIcon(self.style().standardIcon(QStyle.StandardPixmap.SP_DialogSaveButton)), "Build Multicore ROM List", self, triggered=self.makeMulticoreROMList)                                                                              
-        self.menu_os.menu_update_multicore.addAction(action_makeMulticoreROMList) 
+
+  
+
         #Sub-menu for updating themes
         self.menu_os.menu_change_theme = self.menu_os.addMenu("Theme")
         try:
@@ -678,6 +693,12 @@ from tzlion on frogtool. Special thanks also goes to wikkiewikkie & Jason Grieve
         self.readme_dialog = ReadmeDialog(basedir)
         self.readme_dialog.show()
 
+    def change_OS(self):
+        url = self.OS_options[self.sender().text()]
+        logging.info("Tadpole~change_OS: Updating OS from ({url})")
+        self.UpdateDeviceFromZip(url)
+
+    """
     def UpdatetoV1_5(self):
         logging.info("Tadpole~UpdatetoV1_5")
         url = "https://api.github.com/repos/EricGoldsteinNz/SF2000_Resources/contents/OS/V1.5"
@@ -697,6 +718,7 @@ from tzlion on frogtool. Special thanks also goes to wikkiewikkie & Jason Grieve
         logging.info("Tadpole~UpdateMulticore006")
         url = "https://github.com/EricGoldsteinNz/SF2000_Resources/raw/main/OS/multicore_alpha_0.06.zip"
         self.UpdateDeviceFromZip(url)
+    """
 
     def makeMulticoreROMList(self):
         logging.info("Tadpole~makeMulticoreROMList")
@@ -1007,8 +1029,6 @@ This process is only tested on Windows and will not work on Linux/Mac.\n\nDo you
             msgBox.close()
             logging.error("Tadpole~UpdateDeviceFromZip: Failed. downloadAndExtractZIP did not return True.")
             QMessageBox.about(self, "Failure","ERROR: Something went wrong while trying to download the update")
-    
-    
     
     def change_theme(self, url):
         qm = QMessageBox()
