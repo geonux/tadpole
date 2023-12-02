@@ -233,29 +233,35 @@ class MainWindow (QMainWindow):
         #Sub-menu for updating Firmware
         self.menu_os.menu_update = self.menu_os.addMenu("Firmware")
         # Get firmware from tadpole storage
-        response = requests.get("https://tadpolestorage.blob.core.windows.net/$web/os.json")
-        self.OS_options = {} #This approach means that two items must never have the same name or there will be a collision. 
-        if response.status_code == 200:
-            data = json.loads(response.content)
-            # Read official firmware versions
-            for item in data["official"]["versions"]:
-                title = item["title"]
-                link = item["link"]
-                self.OS_options[title] = link                                                                              
-                self.menu_os.menu_update.addAction(QAction(QIcon(self.style().standardIcon(QStyle.StandardPixmap.SP_DialogSaveButton)), 
-                                                           title, 
-                                                           self, 
-                                                           triggered=self.change_OS))
-            self.menu_os.menu_update.addSeparator()
-            # Read multicore firmware versions
-            for item in data["multicore"]["versions"]:
-                title = item["title"]
-                link = item["link"]
-                self.OS_options[title] = link                                                                              
-                self.menu_os.menu_update.addAction(QAction(QIcon(self.style().standardIcon(QStyle.StandardPixmap.SP_DialogSaveButton)), 
-                                                           title, 
-                                                           self, 
-                                                           triggered=self.change_OS))  
+        try:
+            response = requests.get("https://tadpolestorage.blob.core.windows.net/$web/os.json")
+            self.OS_options = {} #This approach means that two items must never have the same name or there will be a collision. 
+            if response.status_code == 200:
+                data = json.loads(response.content)
+                # Read official firmware versions
+                for item in data["official"]["versions"]:
+                    title = item["title"]
+                    link = item["link"]
+                    self.OS_options[title] = link                                                                              
+                    self.menu_os.menu_update.addAction(QAction(QIcon(self.style().standardIcon(QStyle.StandardPixmap.SP_DialogSaveButton)), 
+                                                            title, 
+                                                            self, 
+                                                            triggered=self.change_OS))
+                self.menu_os.menu_update.addSeparator()
+                # Read multicore firmware versions
+                for item in data["multicore"]["versions"]:
+                    title = item["title"]
+                    link = item["link"]
+                    self.OS_options[title] = link                                                                              
+                    self.menu_os.menu_update.addAction(QAction(QIcon(self.style().standardIcon(QStyle.StandardPixmap.SP_DialogSaveButton)), 
+                                                            title, 
+                                                            self, 
+                                                            triggered=self.change_OS))  
+        except Exception as e:
+            logging.error(f"tadpole~loadMenus: ERROR occured while trying to load OS menu. {str(e)}")
+            action_OSmenuError = QAction(QIcon(self.style().standardIcon(QStyle.StandardPixmap.SP_MessageBoxCritical)), "Error loading OS menu", self) 
+            action_OSmenuError.setEnabled(False)                                                                             
+            self.menu_os.menu_update.addAction(action_OSmenuError) 
         action_makeMulticoreROMList  = QAction(QIcon(self.style().standardIcon(QStyle.StandardPixmap.SP_DialogSaveButton)), "Rebuild Multicore ROM List", self, triggered=self.makeMulticoreROMList)                                                                              
         self.menu_os.menu_update.addAction(action_makeMulticoreROMList) 
         self.menu_os.menu_update.addSeparator()
