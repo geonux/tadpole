@@ -5,11 +5,14 @@ by EricGoldstein
 
 Tadpole is a device management tool for rthe SF2000 / Datafrog. It currently provides the following main features:
 * Rebuilding of the console specific rom lists
+* Changing the firmware to official releases or multicore (including rebuilding multicore gamelists)
 * Merging ROM zips and jpg files with the same name to the relevant Zxx fileformat for each console
 * Changing the four in menu game shortcuts for each console
 * Changing the boot logo
 * Changing the background music
 * Changing the Console logos
+* Applying the bootloader fix
+* Applying the battery fix
 * Automating the GBA bios fix
 
 
@@ -50,37 +53,13 @@ Basic usage steps
 1. Insert the SF2000 SD card in a card reader connected to your computer
 2. Drag and drop your desired ROMs into the respective system folders (ARCADE, FC, GB, GBA, GBC, MD, SFC) 
 3. Run tadpole (double-click tadpole.exe or run the python from source)
-3. Select the drive letter and the system you want to rebuild the game list for. Selecting ALL will rebuild all game lists.
-4. Click "Update!"
+3. All the standard games lists will be rebuilt as soon as tadpole opens.
+4. Other changes such as updating the OS, changing the boot logo, background music, or theme can be made from the menu.
 
 
-Compatible versions
--------------------
 
-This tool has been tested & confirmed to work on the following SF2000 firmware/SD card image versions:
-* Launch version (with English & Chinese languages only)
-* 2023-04-20 update (with 17 languages)
-* 2023-05-12 update (adds keymapping, favourites, history) - This works but can mess up the favourites and history
-  sections as they're based on position in the list rather than filename. For the time being, if you have problems,
-  delete Resources/Favorites.bin and Resources/History.bin from the SD card. This won't stop the features from working
-  but will remove any existing favourites or history you have.
-
-
-Use on any later versions is at your own risk!
-
-
-Backups
--------
-
-On first run, this program will automatically create backups of all game list files for the selected system(s).
-These will be placed alongside the originals and have "_orig" appended to their name.
-
-So, if something goes wrong or you just want to roll back your device to its original state, you can delete the files
-created by this program, and rename the "_orig" ones back to their original names.
-
-(See "List file reference" section to see which files are which)
-
-
+Other Details
+===============
 Supported files
 ---------------
 
@@ -151,7 +130,7 @@ They correspond to the following systems:
 * .zgb = GB, GBC, GBA
 * .zfb = ARCADE
 
-This tool now supports generating these files, so you can use your own custom thumbnails! (Except arcade games for now.)
+Tadpole supports generating these files, so you can use your own custom thumbnails! (Except arcade games for now.)
 
 Just drop a zipped rom and an image (png, jpg, gif) with the same filename in the same folder, run frogtool and it will
 automatically combine the two into an appropriate .zxx file. (The source image and zip file will be deleted.)  
@@ -160,52 +139,6 @@ Example: "Bubsy.zip" and "Bubsy.jpg" would be combined to "Bubsy.zsf" if placed 
 
 Thumbnails in this system are 144 x 208 pixels, your image will be resized to those dimensions if necessary.
 
-### Technical details
-
-All .zxx files except .zfb are laid out as follows:
-* First 0xEA00 bytes: Thumbnail image, RGB565 RAW format, 144x208px
-* Rest of the file: A zipped rom in "WQW" format
-
-"WQW" is an obfuscated zip file format found on several emulation devices, with filenames scrambled and headers modified
-to inhibit use by ordinary zip software. However, you can actually use a normal unmodified zip inside a .zxx file and
-the OS will load it just fine. (That's what this tool does when generating these files.)
-
-So, if you want to manually create a .zxx file you can do so by creating a thumbnail in the specified RAW format, and
-then appending a zipped ROM to it.
-
-.zfb files for arcade games are different: they contain the same kind of image, but don't contain the actual game ROM.
-Instead the image is followed by four 00 bytes, then the actual filename of the ROM in the "bin" folder, then two
-further 00 bytes.
-
-
-List file reference
--------------------
-
-The game list files are found in the Resources folder alongside graphical and audio assets and other resources used by
-the OS. However, the files in this folder are all given meaningless or misleading names.
-For the game lists this is as follows:
-
-| System | Filenames | Chinese   | Pinyin    |
-|--------|-----------|-----------|-----------|
-| ARCADE | mswb7.tax | msdtc.nec | mfpmp.bvs |
-| FC     | rdbui.tax | fhcfg.nec | nethn.bvs |
-| GB     | vdsdc.tax | umboa.nec | qdvd6.bvs |
-| GBA    | vfnet.tax | htuiw.nec | sppnp.bvs |
-| GBC    | pnpui.tax | wjere.nec | mgdel.bvs |
-| MD     | scksp.tax | setxa.nec | wmiui.bvs |
-| SFC    | urefs.tax | adsnt.nec | xvb6c.bvs |
-
-Explanation of the list types:
-* Filenames = The names of each ROM file. These are also used for the English menus, with file extensions stripped off.
-* Chinese = Chinese translations of each game name, UTF-8 encoded, used for the Chinese menus
-* Pinyin = Pinyin initials of each Chinese game name, used for the Chinese search function
-
-As mentioned above, this tool does not currently support generating the Chinese game lists, and will replace them with
-duplicate English lists. This means the console will still work in Chinese mode, but all game titles and search
-functionality will be in English.
-
-If you are manually restoring these files from a backup, you should ensure that each set of three files is kept in sync:
-for example, if you want to restore a backup for GB, you should restore vdsdc.tax, umboa.nec and qdvd6.bvs.
 
 Credits
 -------
