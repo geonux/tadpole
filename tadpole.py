@@ -626,8 +626,10 @@ the thumbnail for you. ")
                 self.BGM_change(d.music_file)
             else:
                 self.BGM_change(self.music_options[self.sender().text()])
+        #Clean up any residual downloaded files. TODO the download and replace should be done in memory instead of on disk
         if os.path.exists(os.path.join(static_TadpoleDir, 'preview.wav' )):
             os.remove(os.path.join(static_TadpoleDir, 'preview.wav'))
+
     def about(self):
         QMessageBox.about(self, "About Tadpole", 
                                 "Tadpole was created by EricGoldstein based on the original work \

@@ -677,7 +677,7 @@ def changeBackgroundMusic(drive_path: str, url: str = "", file: str = "") -> boo
         return downloadAndReplace(drive_path, os.path.join("Resources","pagefile.sys"), url)
     elif file and not url:
         try:
-            shutil.copyfile(os.path.join(drive_path, "Resources", "pagefile.sys"), file)
+            shutil.copyfile(file, os.path.join(drive_path, "Resources", "pagefile.sys"))
             return True
         except:
             return False
