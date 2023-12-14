@@ -83,9 +83,13 @@ def makeMulticoreROMList_ARCADEMode(drive):
         if(d == "2048"):
             CreateMulticoreZFB("2048;game.gba",os.path.join(drive, "ARCADE","2048.zfb"))
         elif(d == "cavestory"):
-            CreateMulticoreZFB("cavestory;Config.dat.gba",os.path.join(drive, "ARCADE","Cave Story.zfb"))  
+            CreateMulticoreZFB("cavestory;Config.dat.gba",os.path.join(drive, "ARCADE","Cave Story.zfb"))
+        elif(d =="gong"):
+            CreateMulticoreZFB("gong;game.gba",os.path.join(drive, "ARCADE","Gong.zfb"))
+        elif(d == "mrboom"):
+            CreateMulticoreZFB("mrboom;dummy.gba",os.path.join(drive, "ARCADE","Mrboom.zfb"))
         elif(d == "wolf3d"):
-            CreateMulticoreZFB("wolf3d;WOLF3D.EXE.gba",os.path.join(drive, "ARCADE","Wolf 3D.zfb"))         
+            CreateMulticoreZFB("wolf3d;WOLF3D.EXE.gba",os.path.join(drive, "ARCADE","Wolfenstein 3D.zfb"))         
         elif os.path.isdir(os.path.join(drive,"cores",d)):
             logging.info(f"Build Multicore ROMs for {d}")
             print(f"Got to {d}")
