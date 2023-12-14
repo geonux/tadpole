@@ -1369,7 +1369,7 @@ Note: You can change in settings to either pick your own or try to downlad autom
             self.tbl_gamelist.setRowCount(0)
             print("frogtool stop execution on table load caught")
         msgBox.close()  
-        self.tbl_gamelist.scrollToTop()
+        #self.tbl_gamelist.scrollToTop()
         self.tbl_gamelist.show()
 
     def RebuildClicked(self):
