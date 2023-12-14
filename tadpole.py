@@ -30,6 +30,7 @@ import time
 import frogtool
 import tadpole_functions
 from tadpoleConfig import TadpoleConfig
+import multicore_functions
 # Dialog imports
 from dialogs.SettingsDialog import SettingsDialog
 from dialogs.ThumbnailDialog import ThumbnailDialog
@@ -222,8 +223,19 @@ class MainWindow (QMainWindow):
                                     triggered=self.about)
         self.exit_action = QAction("E&xit", self, shortcut="Ctrl+Q",triggered=self.close)
 
+    def testFunction(self):
+        drive = self.combobox_drive.currentText()
+        multicore_rom_string = "gb;Pokemon - Red Version (USA, Europe) (SGB Enhanced).gb.gba"
+        dest_filename = os.path.join(drive, "ARCADE","Pokemon - Red Version (USA, Europe) (SGB Enhanced).zfb")
+        multicore_functions.CreateMulticoreZFB(multicore_rom_string,dest_filename)
+        RunFrogTool(drive, "ARCADE")
+        QMessageBox.about(self, "Multicore Redirectors", "Finished build Multicore redirectors")
+
+
     def loadMenus(self):
         self.menu_file = self.menuBar().addMenu("&File")
+        TestFunction_action = QAction("Test Function", self, triggered=self.testFunction)
+        #self.menu_file.addAction(TestFunction_action)
         Settings_action = QAction("Settings...", self, triggered=self.Settings)
         self.menu_file.addAction(Settings_action)
         self.menu_file.addAction(self.exit_action)
@@ -257,13 +269,18 @@ class MainWindow (QMainWindow):
                                                             title, 
                                                             self, 
                                                             triggered=self.change_OS))  
+                    
+                #Get the latest firmware version
+                self.OS_latest = data["multicore"]["latest"]
         except Exception as e:
             logging.error(f"tadpole~loadMenus: ERROR occured while trying to load OS menu. {str(e)}")
             action_OSmenuError = QAction(QIcon(self.style().standardIcon(QStyle.StandardPixmap.SP_MessageBoxCritical)), "Error loading OS menu", self) 
             action_OSmenuError.setEnabled(False)                                                                             
             self.menu_os.menu_update.addAction(action_OSmenuError) 
-        action_makeMulticoreROMList  = QAction(QIcon(self.style().standardIcon(QStyle.StandardPixmap.SP_DialogSaveButton)), "Rebuild Multicore ROM List", self, triggered=self.makeMulticoreROMList)                                                                              
+        action_makeMulticoreROMList  = QAction(QIcon(self.style().standardIcon(QStyle.StandardPixmap.SP_BrowserReload)), "Rebuild Multicore ROM List", self, triggered=self.makeMulticoreROMList)                                                                              
         self.menu_os.menu_update.addAction(action_makeMulticoreROMList) 
+        action_makeMulticoreROMListARCADEMode  = QAction(QIcon(self.style().standardIcon(QStyle.StandardPixmap.SP_BrowserReload)), "Rebuild Multicore ROM List - ARCADE Mode", self, triggered=self.makeMulticoreROMList_ARCADEMode)                                                                              
+        self.menu_os.menu_update.addAction(action_makeMulticoreROMListARCADEMode) 
         self.menu_os.menu_update.addSeparator()
         action_battery_fix  = QAction(QIcon(self.style().standardIcon(QStyle.StandardPixmap.SP_DialogSaveButton)), "Battery Fix - Built by the community (Improves battery life and shows low power warning)", self, triggered=self.Battery_fix)                                                                              
         self.menu_os.menu_update.addAction(action_battery_fix)
@@ -286,11 +303,11 @@ class MainWindow (QMainWindow):
             self.menu_os.menu_change_theme.addAction(error_action)
         else:
             for theme in self.theme_options:
-                self.menu_os.menu_change_theme.addAction(QAction(QIcon(self.style().standardIcon(QStyle.StandardPixmap.SP_DialogSaveButton)),
+                self.menu_os.menu_change_theme.addAction(QAction(QIcon(self.style().standardIcon(QStyle.StandardPixmap.SP_DialogResetButton)),
                                                 theme,
                                                 self,
                                                 triggered=self.change_theme))
-        self.menu_os.menu_change_theme.addAction(QAction(QIcon(self.style().standardIcon(QStyle.StandardPixmap.SP_BrowserReload)),
+        self.menu_os.menu_change_theme.addAction(QAction(QIcon(self.style().standardIcon(QStyle.StandardPixmap.SP_FileDialogContentsView)),
                                         "Check out theme previews and download more themes...",
                                         self,
                                         triggered=lambda: webbrowser.open(("https://zerter555.github.io/sf2000-collection/"))))
@@ -316,7 +333,7 @@ class MainWindow (QMainWindow):
                                                 music,
                                                 self,
                                                 triggered=self.change_background_music))
-        self.menu_os.menu_change_music.addAction(QAction(QIcon(self.style().standardIcon(QStyle.StandardPixmap.SP_BrowserReload)),
+        self.menu_os.menu_change_music.addAction(QAction(QIcon(self.style().standardIcon(QStyle.StandardPixmap.SP_FileDialogContentsView)),
                                         "Check out more background music to download...",
                                         self,
                                         triggered=lambda: webbrowser.open(("https://zerter555.github.io/sf2000-collection/"))))
@@ -343,7 +360,7 @@ class MainWindow (QMainWindow):
                                                 bootlogo,
                                                 self,
                                                 triggered=self.download_bootlogo))
-        self.menu_os.menu_boot_logo.addAction(QAction(QIcon(self.style().standardIcon(QStyle.StandardPixmap.SP_BrowserReload)),
+        self.menu_os.menu_boot_logo.addAction(QAction(QIcon(self.style().standardIcon(QStyle.StandardPixmap.SP_FileDialogContentsView)),
                                             "Check out and download boot logos...",
                                             self,
                                             triggered=lambda: webbrowser.open(("https://zerter555.github.io/sf2000-collection/"))))
@@ -352,11 +369,16 @@ class MainWindow (QMainWindow):
                                         self, 
                                         triggered=self.changeBootLogo)
         self.menu_os.menu_boot_logo.addAction(UpdateBootLogoAction)
-
         #Menus for console logos
         self.menu_os.menu_bios = self.menu_os.addMenu("Emulator BIOS")
         self.GBABIOSFix_action = QAction(QIcon(self.style().standardIcon(QStyle.StandardPixmap.SP_DialogSaveButton)), "Update GBA BIOS", self, triggered=self.GBABIOSFix)
         self.menu_os.menu_bios.addAction(self.GBABIOSFix_action)
+        #Menu for rebuilding SD Cards
+        self.menu_os.addSeparator()
+        self.BuildFreshSDCard_action = QAction(QIcon(self.style().standardIcon(QStyle.StandardPixmap.SP_DialogSaveButton)), "Build Fresh SD Card", self, triggered=self.formatAndDownloadOSFiles)
+        self.menu_os.addAction(self.BuildFreshSDCard_action)
+
+
 
         # Consoles Menu
         self.menu_roms = self.menuBar().addMenu("Consoles")
@@ -474,9 +496,6 @@ class MainWindow (QMainWindow):
                 self.toggle_features(False)
                 #TODO Should probably also clear the table of the ROMs that are still listed
             self.combobox_drive.setCurrentText(current_drive)
-
-    def testFunction(self):
-        print("Called test function. Remember to disable this before publishing")
     
     def Settings(self):
         SettingsDialog(tpConf).exec()
@@ -706,27 +725,6 @@ from tzlion on frogtool. Special thanks also goes to wikkiewikkie & Jason Grieve
         logging.info("Tadpole~change_OS: Updating OS from ({url})")
         self.UpdateDeviceFromZip(url)
 
-    """
-    def UpdatetoV1_5(self):
-        logging.info("Tadpole~UpdatetoV1_5")
-        url = "https://api.github.com/repos/EricGoldsteinNz/SF2000_Resources/contents/OS/V1.5"
-        self.UpdateDevice(url)
-    
-    def Updateto20230803(self):
-        logging.info("Tadpole~Updateto20230803")
-        url = "https://api.github.com/repos/EricGoldsteinNz/SF2000_Resources/contents/OS/20230803"
-        self.UpdateDevice(url)
-
-    def UpdatetoV1_71(self):
-        logging.info("Tadpole~UpdateV1_71")
-        url = "https://api.github.com/repos/EricGoldsteinNz/SF2000_Resources/contents/OS/V1.71"
-        self.UpdateDevice(url)
-
-    def UpdateMulticore006(self):
-        logging.info("Tadpole~UpdateMulticore006")
-        url = "https://github.com/EricGoldsteinNz/SF2000_Resources/raw/main/OS/multicore_alpha_0.06.zip"
-        self.UpdateDeviceFromZip(url)
-    """
 
     def makeMulticoreROMList(self):
         logging.info("Tadpole~makeMulticoreROMList")
@@ -735,10 +733,23 @@ from tzlion on frogtool. Special thanks also goes to wikkiewikkie & Jason Grieve
         msgBox.setText("Rebuilding Multicore ROM list.")
         msgBox.show()
         msgBox.showProgress(0, True)
-        romcount = tadpole_functions.makeMulticoreROMList(drive)
+        romcount = multicore_functions.makeMulticoreROMList(drive)
         msgBox.close()
         QMessageBox.about(self, "Finished Rebuilding Multicore ROMs",f"Found {romcount} ROMs in multicore folders")
     
+    def makeMulticoreROMList_ARCADEMode(self):
+        logging.info("Tadpole~makeMulticoreROMListARCADEMode")
+        drive = self.combobox_drive.currentText()
+        msgBox = DownloadProgressDialog()
+        msgBox.setText("Rebuilding Multicore ROM list.")
+        msgBox.show()
+        msgBox.showProgress(0, True)
+        romcount = multicore_functions.makeMulticoreROMList_ARCADEMode(drive)
+        RunFrogTool(drive, "ARCADE")
+        msgBox.close()
+        QMessageBox.about(self, "Finished Rebuilding Multicore ROMs",f"Found {romcount} ROMs in multicore folders")
+ 
+
     def Battery_fix(self):
         logging.info("Tadpole~Battery_fix")
         qm = QMessageBox()
@@ -829,7 +840,12 @@ from tzlion on frogtool. Special thanks also goes to wikkiewikkie & Jason Grieve
         msgBox = DownloadProgressDialog()
         msgBox.setText("Downloading Firmware Update.")
         msgBox.show()
-        tadpole_functions.DownloadOSFiles(correct_drive, msgBox.progress)
+        #If the latest version has been retrieved then open that
+        if self.OS_latest is not None:
+            tadpole_functions.downloadAndExtractZIPBar(drive, self.OS_latest, msgBox)
+        else:
+            logging.error(f"tadpole~formatAndDownloadOSFiles: ERROR self.OS_latest was not set.")
+            tadpole_functions.DownloadOSFiles(correct_drive, msgBox.progress)
         ret = QMessageBox.question(self, "Try booting",  "Try putting the SD card in the SF2000 and starting it.  Did it work?")
         if ret == qm.No:
             QMessageBox.about(self, "Not booting", "Sorry it didn't work; Consult https://github.com/vonmillhausen/sf2000#bootloader-bug or ask for help on Discord https://discord.gg/retrohandhelds.")
@@ -901,8 +917,8 @@ from tzlion on frogtool. Special thanks also goes to wikkiewikkie & Jason Grieve
     The SF2000 may not boot.  You can always try this fix again in the Firmware options")
                 logging.info("User skipped bootloader")
                 return
-        bootloaderPatchDir = os.path.join(drive,"/UpdateFirmware/")
-        bootloaderPatchPathFile = os.path.join(drive,"/UpdateFirmware/Firmware.upk")
+        bootloaderPatchDir = os.path.join(drive,"UpdateFirmware")
+        bootloaderPatchPathFile = os.path.join(drive,"UpdateFirmware","Firmware.upk")
         bootloaderChecksum = "eb7a4e9c8aba9f133696d4ea31c1efa50abd85edc1321ce8917becdc98a66927"
         #Let's delete old stuff if it exits incase they tried this before and failed
         if Path(bootloaderPatchDir).is_dir():
@@ -935,8 +951,7 @@ from tzlion on frogtool. Special thanks also goes to wikkiewikkie & Jason Grieve
             if Path(bootloaderPatchDir).is_dir():
                 shutil.rmtree(bootloaderPatchDir)
             if ret == qm.Yes:
-                QMessageBox().about(self, "Update complete", "Your SF2000 should now be safe to use with \
-    Tadpole. Major thanks to osaka#9664 on RetroHandhelds Discords for this fix!\n\n\
+                QMessageBox().about(self, "Update complete", "Your SF2000 should now be safe to use with Tadpole. Major thanks to osaka#9664 on RetroHandhelds Discords for this fix!\n\n\
     Remember, you only need to apply the bootloader fix once to your SF2000.  Unlike other changes affecting the SD card, this changes the code running on the SF2000.")
                 logging.info("Bootloader installed correctly...or so the user says")
                 return
@@ -986,6 +1001,7 @@ Did it boot this time?")
 Sending you to that option now")
                 self.FixSF2000Boot()
                 return
+    
     def FixSF2000Boot(self):
         qm = QMessageBox
         ret = qm.question(self, "SF2000 not booting", "If your SF2000 won't boot, you likely hit the bootloader bug or have broken some critical files.  This process attempts to restore your SF2000.\n\n\
@@ -1029,13 +1045,13 @@ This process is only tested on Windows and will not work on Linux/Mac.\n\nDo you
         msgBox.setText("Downloading Firmware Update.")
         msgBox.show()
         msgBox.showProgress(0, True)
-        if tadpole_functions.downloadAndExtractZIP(drive, url, msgBox):
+        if tadpole_functions.downloadAndExtractZIPBar(drive, url, msgBox):
             msgBox.close()
             logging.info("Tadpole~UpdateDeviceFromZip: Sucessfully downloaded and extracted ({url})")
             QMessageBox.about(self, "Success","Update successfully downloaded")
         else:
             msgBox.close()
-            logging.error("Tadpole~UpdateDeviceFromZip: Failed. downloadAndExtractZIP did not return True.")
+            logging.error("Tadpole~UpdateDeviceFromZip: Failed. downloadAndExtractZIPBar did not return True.")
             QMessageBox.about(self, "Failure","ERROR: Something went wrong while trying to download the update")
     
     def change_theme(self, url):

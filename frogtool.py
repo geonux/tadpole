@@ -37,6 +37,8 @@ supported_zip_ext = [
     "bkp", "zip"
 ]
 
+defaultThumbnailSize = (144, 208)
+
 
 class StopExecution(Exception):
     pass
@@ -176,7 +178,7 @@ def convert_zip_image_to_zxx(path, img_file, zip_file, zxx_ext):
     zxx_file_name = f"{strip_file_extension(img_file.name)}.{zxx_ext}"
     zxx_file_path = os.path.join(path,zxx_file_name)
 
-    converted = rgb565_convert(img_file_path, zxx_file_path, (144, 208))
+    converted = rgb565_convert(img_file_path, zxx_file_path, defaultThumbnailSize)
     if not converted:
         return False
 
@@ -201,7 +203,6 @@ def convert_zip_image_to_zxx(path, img_file, zip_file, zxx_ext):
 
 
 def rgb565_convert(src_filename, dest_filename, dest_size=None):
-
     if not image_lib_avail:
         print("! Pillow module not found, can't do image conversion")
         return False
@@ -215,9 +216,6 @@ def rgb565_convert(src_filename, dest_filename, dest_size=None):
     except (OSError, IOError):
         print(f"! Failed opening destination file {dest_filename} for conversion")
         return False
-    
-
-
     # convert the image to RGB if it was not already
     image = Image.new('RGB', srcimage.size, (0, 0, 0))
     image.paste(srcimage, None)
@@ -256,9 +254,7 @@ def rgb565_convert(src_filename, dest_filename, dest_size=None):
             b = pixel[2] >> 3
             rgb = (r << 11) | (g << 5) | b
             dest_file.write(struct.pack('H', rgb))
-
     dest_file.close()
-
     return True
 
 

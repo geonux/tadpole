@@ -2,7 +2,7 @@
 from PyQt5.QtGui import *
 from PyQt5.QtCore import *
 from PyQt5.QtWidgets import *
-# OS imports - these should probably be moved somewhere else
+# OS imports
 import os
 import shutil
 import hashlib
@@ -14,6 +14,7 @@ import frogtool
 import requests
 import json
 import logging
+import time
 
 try:
     from PIL import Image
@@ -66,7 +67,6 @@ ROMArt_console = {
 offset_logo_presequence = [0x62, 0x61, 0x64, 0x5F, 0x65, 0x78, 0x63, 0x65, 0x70, 0x74, 0x69, 0x6F, 0x6E, 0x00, 0x00, 0x00]
 offset_buttonMap_presequence = [0x00, 0x00, 0x00, 0x71, 0xDB, 0x8E, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00]
 offset_buttonMap_postsequence = [0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x02, 0x00, 0x00, 0x00, 0x02, 0x00, 0x00, 0x00]
-
 
 class Exception_InvalidPath(Exception):
     pass    
@@ -820,7 +820,8 @@ def downloadFileFromGithub(outFile, url):
         print(str(e))
         return False
 
-
+"""
+#This function has been replaced by "downloadAndExtractZIPBar"
 def downloadAndExtractZIP(root, url, progress):
     try:
         response = requests.get(url)
@@ -836,7 +837,32 @@ def downloadAndExtractZIP(root, url, progress):
     except Exception as e:
         logging.error(f"tadpole_functions~downloadAndExtractZIP: ERROR {str(e)}")
     return False
+"""
 
+def downloadAndExtractZIPBar(root, url, progress):
+    try:
+        response = requests.get(url, stream=True)
+        total_length = int(response.headers.get('content-length'))
+        dl = 0
+        zip_in_memory = bytearray()
+        for data in response.iter_content(chunk_size=4096):
+            if data:
+                dl += len(data)
+                zip_in_memory.extend(data)  
+                progress.showProgress(int(100 * dl / total_length), True)
+        logging.info(f"tadpole_functions~downloadAndExtractZIP: Received {response.status_code} for ({url})")
+        if response.status_code == 200:
+            zip = zipfile.ZipFile(BytesIO(zip_in_memory))
+            zip.extractall(path=root)          
+            return True
+        else: 
+            logging.error("tadpole_functions~downloadAndExtractZIP: Problem when trying to download a file from Github. Response was not code 200")
+            raise InvalidURLError
+    except Exception as e:
+        logging.error(f"tadpole_functions~downloadAndExtractZIP: ERROR {str(e)}")
+    return False
+
+#Keeping this for now as a failsafe, but should remove it to follow the new design structure
 def DownloadOSFiles(correct_drive, progress): 
     downloadDirectoryFromGithub(correct_drive,"https://api.github.com/repos/EricGoldsteinNz/SF2000_Resources/contents/OS/V1.6", progress)
     #Make the ROM directories
@@ -866,22 +892,6 @@ def DownloadOSFiles(correct_drive, progress):
     #Jason: Per Dteyn, we need to remove and redownlaod bisrv.asd to clear the known bug bootloader crash
     downloadFileFromGithub(os.path.join(correct_drive,"bios","bisrv.asd"), "https://raw.githubusercontent.com/EricGoldsteinNz/SF2000_Resources/main/OS/V1.6/bios/bisrv.asd")        
     return True
-
-def makeMulticoreROMList(drive):
-    logging.info("tadpole_functions~makeMulticoreROMList")
-    romcount = 0
-    for d in os.listdir(os.path.join(drive,"cores")):
-        if os.path.isdir(os.path.join(drive,"cores",d)):
-            logging.info(f"Build Multicore ROMs for {d}")
-            romfolder = os.path.join(drive,"ROMS",d)
-            if os.path.exists(romfolder):
-                for rom in os.listdir(romfolder):
-                    romcount += 1
-                    # Creates a new file 
-                    with open(os.path.join(drive,"ROMS",f"{d};{rom}.gba"), 'w'): 
-                        pass
-    return romcount
-
 
 def emptyFavourites(drive) -> bool:
     return emptyFile(os.path.join(drive, "Resources", "Favorites.bin"))
@@ -956,13 +966,10 @@ def createZFBFile(drive, pngPath, romPath):
         with open(zfb_file, 'wb') as zfb:
             # Write the image data to the .zfb file
             zfb.write(raw_data_bytes)
-
             # Write four 00 bytes
             zfb.write(b'\x00\x00\x00\x00')
-
             # Write the ROM filename
             zfb.write(ZIPName.encode())
-
             # Write two 00 bytes
             zfb.write(b'\x00\x00')
         logging.info(f"ZFB file created successfully.")
@@ -970,6 +977,8 @@ def createZFBFile(drive, pngPath, romPath):
     except Exception as e:
         logging.error(f"An error occurred while creating the ZFB file: {str(e)}")
         return False
+
+
 
 def deleteROM(ROMfilePath):
     logging.info(f"Tadpole_functions~ Deleting ROM: {ROMfilePath}")
@@ -1068,26 +1077,6 @@ def createSaveBackup(drive: str, zip_file_name):
                         except Exception as e:
                             print(f"Bad zip file encountered: {os.path.join(root, file)}")
                             continue
-        # zipf = zipfile.ZipFile('Python.zip', 'w', zipfile.ZIP_DEFLATED)
-        # zipdir('/tmp/', zipf)
-        # zipf.close()
-
-        # # Create object of ZipFile
-        #with zipfile.ZipFile(zip_file_name, 'w') as zip_object:
-        #     # Traverse all files in directory
-        #     for folder_name, sub_folders, file_names in os.walk(drive):
-        #         for filename in file_names:
-        #             # Filter for save files
-        #             if check_is_save_file(filename):
-        #                 print(f"Found save: {folder_name} ; {filename}")
-        #                 # Create filepath of files in directory
-        #                 file_path = os.path.join(folder_name, filename)
-        #                 # Add files to zip file
-        #                 try:
-        #                     zip_object.write(file_path, os.path.basename(file_path))   
-        #                 except OSError:
-        #                     os.utime(file_path, None)
-        #                     zip_object.write(file_path, os.path.basename(file_path))
         return True
     except Exception as e:
         logging.error({e})
@@ -1114,22 +1103,18 @@ def convertRGB565toPNG(inputFile):
         # Read the binary data
         with open(inputFile, 'rb') as file:
             data = file.read()
-
         # Unpack the RGB565 data
         pixels = struct.unpack('<' + ('H' * (len(data) // 2)), data)
-
         # Convert the RGB565 values to RGB888 format
         rgb888_pixels = [
             ((pixel & 0xF800) >> 8, (pixel & 0x07E0) >> 3, (pixel & 0x001F) << 3)
             for pixel in pixels
         ]
-
         # Create an image from the pixels
         width = 640  # Specify the width of the image
         height = len(rgb888_pixels) // width
         image = Image.new('RGB', (width, height))
         image.putdata(rgb888_pixels)
-
         # Save the image as PNG
         image.save('currentBackground.temp.png')
         return image
@@ -1182,15 +1167,11 @@ def copy_files(source, destination, progressBar):
     total_files = 0
     for root, dirs, files in os.walk(source):
         total_files += len(files)
-
-    #progressBar.setMaximum(total_files)
-
     copied_files = 0
     for root, dirs, files in os.walk(source):
         for file in files:
             source_file = os.path.join(root, file)
             destination_file = os.path.join(destination, os.path.relpath(source_file, source))
-
             os.makedirs(os.path.dirname(destination_file), exist_ok=True)
             with open(source_file, 'rb') as src, open(destination_file, 'wb') as dst:
                 while True:

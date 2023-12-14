@@ -7,6 +7,7 @@ Tadpole is a device management tool for rthe SF2000 / Datafrog. It currently pro
 * Rebuilding of the console specific rom lists
 * Changing the firmware to official releases or multicore (including rebuilding multicore gamelists)
 * Merging ROM zips and jpg files with the same name to the relevant Zxx fileformat for each console
+* Downloading cover art for ROMs
 * Changing the four in menu game shortcuts for each console
 * Changing the boot logo
 * Changing the background music
@@ -57,6 +58,13 @@ Basic usage steps
 4. Other changes such as updating the OS, changing the boot logo, background music, or theme can be made from the menu.
 
 
+
+Building a new SD Card
+-----------------
+
+1. Start with Tadpole open and the SD card connected to the computer.
+2. Open the OS menu, and select "Build Fresh SD Card".
+3. Follow the instructions on screen to build a new SD
 
 Other Details
 ===============
