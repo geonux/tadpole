@@ -802,6 +802,7 @@ from tzlion on frogtool. Special thanks also goes to wikkiewikkie & Jason Grieve
                 return False
 
     def formatAndDownloadOSFiles(self):
+        logging.error(f"tadpole~formatAndDownloadOSFiles: Prompting use to select a foramtted drive")
         foundSD = False
         QMessageBox.about(self, "Formatting", "First format your SD card. After pressing OK the partition tool will come up enabling you to format it.\n\n\
     Format it to with a drive letter and to FAT32.  It may say the drive is in use; that is Normal as Tadpole is looking for it.")
@@ -816,12 +817,12 @@ from tzlion on frogtool. Special thanks also goes to wikkiewikkie & Jason Grieve
             return False
         for drive in psutil.disk_partitions():
             if not os.path.exists(drive.mountpoint):
-                logging.info("Formatting prevented {drive} can't be read")
+                logging.info(f"Formatting prevented {drive} can't be read")
                 continue
             dir = os.listdir(drive.mountpoint)
             #Windows puts in a System inFormation item that is hidden
             if len(dir) > 1:
-                logging.info("Formatting prevented {drive} isn't empty")
+                logging.info(f"Formatting prevented {drive} isn't empty")
                 continue
             if(drive.mountpoint == f'C:\\'):
                 logging.info("Formatting prevented, be ultra safe don't let them format C")
@@ -842,7 +843,7 @@ from tzlion on frogtool. Special thanks also goes to wikkiewikkie & Jason Grieve
         msgBox.show()
         #If the latest version has been retrieved then open that
         if self.OS_latest is not None:
-            tadpole_functions.downloadAndExtractZIPBar(drive, self.OS_latest, msgBox)
+            tadpole_functions.downloadAndExtractZIPBar(correct_drive, self.OS_latest, msgBox)
         else:
             logging.error(f"tadpole~formatAndDownloadOSFiles: ERROR self.OS_latest was not set.")
             tadpole_functions.DownloadOSFiles(correct_drive, msgBox.progress)

@@ -841,6 +841,7 @@ def downloadAndExtractZIP(root, url, progress):
 
 def downloadAndExtractZIPBar(root, url, progress):
     try:
+        logging.info(f"tadpole_functions~downloadAndExtractZIPBar: Downloading ({url}) to extract to ({root})")
         response = requests.get(url, stream=True)
         total_length = int(response.headers.get('content-length'))
         dl = 0
@@ -850,16 +851,19 @@ def downloadAndExtractZIPBar(root, url, progress):
                 dl += len(data)
                 zip_in_memory.extend(data)  
                 progress.showProgress(int(100 * dl / total_length), True)
-        logging.info(f"tadpole_functions~downloadAndExtractZIP: Received {response.status_code} for ({url})")
+        logging.info(f"tadpole_functions~downloadAndExtractZIPBar: Received {response.status_code} for ({url})")
         if response.status_code == 200:
+            progress.setText("Extracting")
+            progress.showProgress(0, True)
             zip = zipfile.ZipFile(BytesIO(zip_in_memory))
-            zip.extractall(path=root)          
+            zip.extractall(path=root)   
+            progress.showProgress(100, True)       
             return True
         else: 
-            logging.error("tadpole_functions~downloadAndExtractZIP: Problem when trying to download a file from Github. Response was not code 200")
+            logging.error("tadpole_functions~downloadAndExtractZIPBar: Problem when trying to download a file from Github. Response was not code 200")
             raise InvalidURLError
     except Exception as e:
-        logging.error(f"tadpole_functions~downloadAndExtractZIP: ERROR {str(e)}")
+        logging.error(f"tadpole_functions~downloadAndExtractZIPBar: ERROR {str(e)}")
     return False
 
 #Keeping this for now as a failsafe, but should remove it to follow the new design structure
