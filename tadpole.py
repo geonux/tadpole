@@ -540,9 +540,10 @@ class MainWindow (QMainWindow):
         romList = frogtool.getROMList(rom_path)
         msgBox = DownloadProgressDialog()
         failedConversions = 0
-        #Check what the user has configured; upload or download
+        #Check what the user has configured; local or download
         ovewrite = tpConf.getThumbnailOverwrite()
         if not tpConf.getThumbnailDownload():
+            # User has chosen to use local thumbnails
             directory = QFileDialog.getExistingDirectory()
             if directory == '':
                     return
@@ -564,16 +565,17 @@ class MainWindow (QMainWindow):
                             if not tadpole_functions.addThumbnail(rom_full_path, drive, system, newThumbnailPath, ovewrite):
                                 failedConversions += 1
                 msgBox.showProgress(i, True)
-        #User wants to download romart from internet
+        
         else:
-            QMessageBox.about(self, "Add Thumbnails", "You have Tadpole configured to download thumbnails automatically. \
-For this to work, your roms must be in ZIP files and the name of that zip must match their common released English US localized \
-name.  Please refer to https://github.com/EricGoldsteinNz/libretro-thumbnails/tree/master if Tadpole isn't finding \
-the thumbnail for you. ")
+        #User wants to download romart from internet
             #ARCADE can't get ROM art, so just return
             if system == "ARCADE":
                 QMessageBox.about(self, "Add Thumbnails", "Custom Arcade ROMs cannot have thumbnails at this time.")
                 return
+            QMessageBox.about(self, "Add Thumbnails", "You have Tadpole configured to download thumbnails automatically. \
+For this to work, your roms must be in ZIP files and the name of that zip must match their common released English US localized \
+name.  Please refer to https://github.com/EricGoldsteinNz/libretro-thumbnails/tree/master if Tadpole isn't finding \
+the thumbnail for you. ") 
             #Need the url for scraping the png's, which is different
             ROMART_baseURL_parsing = "https://github.com/EricGoldsteinNz/libretro-thumbnails/tree/master/"
             ROMART_baseURL = "https://raw.githubusercontent.com/EricGoldsteinNz/libretro-thumbnails/master/"
@@ -724,6 +726,8 @@ from tzlion on frogtool. Special thanks also goes to wikkiewikkie & Jason Grieve
         url = self.OS_options[self.sender().text()]
         logging.info("Tadpole~change_OS: Updating OS from ({url})")
         self.UpdateDeviceFromZip(url)
+        #Rebuild the ROM lists just incase we did a full rebuild
+        RunFrogTool(self.combobox_drive.currentText(),static_AllSystems)
 
 
     def makeMulticoreROMList(self):
