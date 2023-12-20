@@ -17,7 +17,7 @@ import logging
 import time
 
 try:
-    from PIL import Image
+    from PIL import Image, ImageDraw
     image_lib_avail = True
 except ImportError:
     Image = None
@@ -1064,6 +1064,95 @@ def stripShortcutText(drive: str):
     except (OSError, IOError) as e:
         print(f"! Failed striping shortcut labels. {e}")
         return False
+
+_static_shortcut_FC = 0
+_static_shortcut_SFC = 1
+_static_shortcut_MD = 2
+_static_shortcut_GB = 3
+_static_shortcut_GBC = 4
+_static_shortcut_GBA = 5
+_static_shortcut_ARCADE = 6
+
+def updateShortcutTextforConsole(drive: str, console: int, game1:str, game2:str, game3:str, game4:str):
+    if drive == "???" or drive == "":
+        raise Exception_InvalidPath
+    if (console < 0 or console > _static_shortcut_ARCADE):
+        raise Exception_InvalidConsole
+    gakne_path = os.path.join(drive, "Resources", "gakne.ctp")
+    try:
+        shortcutText = openBRGAasImage(gakne_path)
+        shortcutNewText = ImageDraw.Draw(Image.new("RGBA", (144, 32), (255, 255, 255, 255)))        
+        shortcutNewText.text((0,0), game1, (255,255,255))
+        shortcutText.paste(shortcutNewText, (0,0), shortcutNewText)
+        shortcutNewText = ImageDraw.Draw(Image.new("RGBA", (144, 32), (255, 255, 255, 255)))     
+        shortcutNewText.text((0,0), game2, (255,255,255))
+        shortcutText.paste(shortcutNewText, (0,0), shortcutNewText)
+        shortcutNewText = ImageDraw.Draw(Image.new("RGBA", (144, 32), (255, 255, 255, 255)))     
+        shortcutNewText.text((0,0), game3, (255,255,255))
+        shortcutText.paste(shortcutNewText, (0,0), shortcutNewText)
+        shortcutNewText = ImageDraw.Draw(Image.new("RGBA", (144, 32), (255, 255, 255, 255)))   
+        shortcutNewText.text((0,0), game4, (255,255,255))
+        shortcutText.paste(shortcutNewText, (0,0), shortcutNewText)
+
+        # Gakne is made up of 8 rows of 4 items for a total of 32 items.
+        # Each image is 144 x 32. Total image size 576 x 256.
+        # To only strip the shortcut text we want to leave the settings menu items. So we have to skip the first 18,432 bytes
+        # Console order: FC, SFC, MD, GB, GBC, GBA, ARCADE
+        
+        # TODO XXXXXX
+        writeImagetoBGRAfile(gakne_path)
+        return True
+    except (OSError, IOError) as e:
+        print(f"! Failed updating shortcut labels. {e}")
+        return False
+
+def openBRGAasImage(inputFile):
+    # Read the binary data
+    with open(inputFile, 'rb') as file:
+        data = file.read()
+    # Unpack the BGRA8888 data
+    pixels = struct.unpack('<' + ('H' * (len(data) // 2)), data)
+    # Convert the BGRA8888 values to RGBA888 format
+    rgba8888_pixels = [
+            ((pixel & 0xFF000000) >> 16, (pixel & 0x00FF0000) >> 8, (pixel & 0x0000FF00), (pixel & 0x000000FF))
+            for pixel in pixels
+    ]
+    # Create an image from the pixels
+    width = 576  # Specify the width of the image
+    height = len(rgba8888_pixels) // width
+    image = Image.new('RGBA', (width, height))
+    image.putdata(rgba8888_pixels)
+    return image
+
+def writeImagetoBGRAfile(image:Image, outfile:str):
+    try:
+        dest_file = open(outfile, "wb")
+        image_height = image.size[1]
+        image_width = image.size[0]
+        pixels = image.load()
+
+        if not pixels:
+            logging.error(f"tadpole_functions~writeImagetoBGRAfile: Failed to load image")
+            return False
+
+        for h in range(image_height):
+            for w in range(image_width):
+                pixel = pixels[w, h]
+                if not type(pixel) is tuple:
+                    logging.error(f"! Unexpected pixel type at {w}x{h} from {outfile}")
+                    return False
+                r = pixel[0]
+                g = pixel[1]
+                b = pixel[2]
+                a = pixel[3]
+                bgra = (b << 24) | (g << 16) | (r << 8) | a
+                outfile.write(struct.pack('H', bgra))
+        outfile.close()
+        return True
+    except (OSError, IOError):
+        logging.error(f"tadpole_functions~writeImagetoBGRAfile: Failed opening image file {outfile} for conversion")
+        return False
+
 
 def createSaveBackup(drive: str, zip_file_name):
     if drive == "???" or drive == "":

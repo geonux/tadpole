@@ -266,7 +266,11 @@ by matching the name of the game and a folder you select?  You can change the ic
                 print(sending_button.text() + ": icon not found")
             return True #it completed
         return False #User cancelled
-                
+
+    def stripShortcutText(self):
+        logging.info(f"GameShortcutIconsDialog~stripShortcutText: Removing shortcut text from {self.drive}")
+        tadpole_functions.stripShortcutText(self.drive)
+
     def Finish(self):
         #Save this working TMP PNG to the right resource file
         if self.console == "SFC":

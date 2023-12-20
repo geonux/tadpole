@@ -225,17 +225,13 @@ class MainWindow (QMainWindow):
 
     def testFunction(self):
         drive = self.combobox_drive.currentText()
-        multicore_rom_string = "gb;Pokemon - Red Version (USA, Europe) (SGB Enhanced).gb.gba"
-        dest_filename = os.path.join(drive, "ARCADE","Pokemon - Red Version (USA, Europe) (SGB Enhanced).zfb")
-        multicore_functions.CreateMulticoreZFB(multicore_rom_string,dest_filename)
-        RunFrogTool(drive, "ARCADE")
-        QMessageBox.about(self, "Multicore Redirectors", "Finished build Multicore redirectors")
+        tadpole_functions.updateShortcutTextforConsole(drive, tadpole_functions._static_shortcut_ARCADE, "test1", "test2", "test3", "test4")
 
 
     def loadMenus(self):
         self.menu_file = self.menuBar().addMenu("&File")
         TestFunction_action = QAction("Test Function", self, triggered=self.testFunction)
-        #self.menu_file.addAction(TestFunction_action)
+        self.menu_file.addAction(TestFunction_action)
         Settings_action = QAction("Settings...", self, triggered=self.Settings)
         self.menu_file.addAction(Settings_action)
         self.menu_file.addAction(self.exit_action)
@@ -292,6 +288,10 @@ class MainWindow (QMainWindow):
 
         #Sub-menu for updating themes
         self.menu_os.menu_change_theme = self.menu_os.addMenu("Theme")
+        action_strip_all_shortcut_text  = QAction(QIcon(self.style().standardIcon(QStyle.StandardPixmap.SP_DialogResetButton)), "Strip all shortcut text", self, triggered=self.stripAllShortcutText)                                                                              
+        self.menu_os.menu_change_theme.addAction(action_strip_all_shortcut_text)
+        self.menu_os.menu_change_theme.addSeparator()
+        
         try:
             self.theme_options = tadpole_functions.get_themes()
         except (ConnectionError, requests.exceptions.ConnectionError):
@@ -1187,6 +1187,11 @@ Note: You can change in settings to either pick your own or try to downlad autom
                 self.addBoxart()
         RunFrogTool(drive,console)
             
+    def stripAllShortcutText(self):
+        drive = self.combobox_drive.currentText()
+        logging.info(f"tadpole~stripShortcutText: Removing shortcut text from {drive}")
+        tadpole_functions.stripShortcutText(drive)
+    
     def validateGameShortcutComboBox(self):
         currentComboBox = self.sender() 
         if currentComboBox.currentText() == '':
