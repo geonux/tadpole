@@ -3,7 +3,7 @@ Tadpole
 
 by EricGoldstein  
 
-Tadpole is a device management tool for rthe SF2000 / Datafrog. It currently provides the following main features:
+Tadpole is a device management tool for the SF2000 / Datafrog. It currently provides the following main features:
 * Rebuilding of the console specific rom lists
 * Changing the firmware to official releases or multicore (including rebuilding multicore gamelists)
 * Merging ROM zips and jpg files with the same name to the relevant Zxx fileformat for each console
@@ -26,12 +26,9 @@ in the proper system categories instead of only being able to add them in the us
 DISCLAIMER
 ----------
 
-This program is experimental and you should use with caution!
+This program is not developed or authorised by any company or individual connected with the SF2000 handheld and is based on public reverse engineering of SF2000 file formats.
 
-It is not developed or authorised by any company or individual connected with the SF2000 handheld and is based on public
-reverse engineering of SF2000 file formats.
-
-Although it will back up the files it modifies, you should make your own backup of the Resources folder and ideally your
+You should make your own backups of the Resources and bios folders and ideally your
 whole SD card so you can restore the original state of your device if anything goes wrong.
 
 

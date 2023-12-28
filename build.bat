@@ -1,5 +1,5 @@
 @echo off
-set ver=1.3.2
+set ver=1.3.3
 rem build script for the distributable versions of tadpole
 if not exist "venv\" (
     python -m venv venv
@@ -13,4 +13,4 @@ if not exist "venv\Lib\site-packages\PIL" (
 if not exist "venv\Lib\site-packages\PyQt5" (
     venv\Scripts\python -m pip install PyQt5
 )
-python -m PyInstaller tadpole.py -n tadpole-%ver%.exe --onefile -F --icon frog.ico --clean --noconsole --version-file versioninfo --add-data="frog.ico;." --add-data="README.md;."
+pyinstaller tadpole.py -n tadpole-%ver%.exe -F --icon frog.ico --clean --noconsole --version-file versioninfo --add-data="frog.ico;." --add-data="README.md;."

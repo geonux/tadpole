@@ -225,8 +225,8 @@ class MainWindow (QMainWindow):
 
     def testFunction(self):
         drive = self.combobox_drive.currentText()
-        tadpole_functions.updateShortcutTextforConsole(drive, tadpole_functions._static_shortcut_ARCADE, "test1", "test2", "test3", "test4")
-
+        tadpole_functions.updateShortcutTextforConsole(drive, tadpole_functions._static_shortcut_ARCADE, "Call", "games", "anything", "you want")
+        print("finished test function")
 
     def loadMenus(self):
         self.menu_file = self.menuBar().addMenu("&File")

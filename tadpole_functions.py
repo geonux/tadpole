@@ -17,7 +17,7 @@ import logging
 import time
 
 try:
-    from PIL import Image, ImageDraw
+    from PIL import Image, ImageDraw, ImageFont
     image_lib_avail = True
 except ImportError:
     Image = None
@@ -1080,27 +1080,23 @@ def updateShortcutTextforConsole(drive: str, console: int, game1:str, game2:str,
         raise Exception_InvalidConsole
     gakne_path = os.path.join(drive, "Resources", "gakne.ctp")
     try:
-        shortcutText = openBRGAasImage(gakne_path)
-        shortcutNewText = ImageDraw.Draw(Image.new("RGBA", (144, 32), (255, 255, 255, 255)))        
-        shortcutNewText.text((0,0), game1, (255,255,255))
-        shortcutText.paste(shortcutNewText, (0,0), shortcutNewText)
-        shortcutNewText = ImageDraw.Draw(Image.new("RGBA", (144, 32), (255, 255, 255, 255)))     
-        shortcutNewText.text((0,0), game2, (255,255,255))
-        shortcutText.paste(shortcutNewText, (0,0), shortcutNewText)
-        shortcutNewText = ImageDraw.Draw(Image.new("RGBA", (144, 32), (255, 255, 255, 255)))     
-        shortcutNewText.text((0,0), game3, (255,255,255))
-        shortcutText.paste(shortcutNewText, (0,0), shortcutNewText)
-        shortcutNewText = ImageDraw.Draw(Image.new("RGBA", (144, 32), (255, 255, 255, 255)))   
-        shortcutNewText.text((0,0), game4, (255,255,255))
-        shortcutText.paste(shortcutNewText, (0,0), shortcutNewText)
-
         # Gakne is made up of 8 rows of 4 items for a total of 32 items.
         # Each image is 144 x 32. Total image size 576 x 256.
         # To only strip the shortcut text we want to leave the settings menu items. So we have to skip the first 18,432 bytes
         # Console order: FC, SFC, MD, GB, GBC, GBA, ARCADE
-        
+        newText = [game1,game2,game3,game4]
+        shortcutText = openBRGAasImage(gakne_path)
+        replaceMask = Image.new("RGBA", (144, 32), (255, 255, 255, 255))
+        fnt = ImageFont.truetype("arial.ttf", 24)
+        for i in range(len(newText)):
+            #Game Slot 1
+            img_g = Image.new("RGBA", (144, 32), (0, 0, 0, 0)) #In the alpha channel 0 is fully transparent, 255 is fully opaque
+            ImageDraw.Draw(img_g).text((72,16), newText[i], (255,255,255),font=fnt, anchor="mm")        
+            shortcutText.paste(img_g, (144*i,(console+1)*32), replaceMask)
+
+        shortcutText.save("C:\\Users\\OEM\\Documents\\test.png")
         # TODO XXXXXX
-        writeImagetoBGRAfile(gakne_path)
+        writeImagetoBGRAfile(shortcutText, gakne_path)
         return True
     except (OSError, IOError) as e:
         print(f"! Failed updating shortcut labels. {e}")
@@ -1111,10 +1107,10 @@ def openBRGAasImage(inputFile):
     with open(inputFile, 'rb') as file:
         data = file.read()
     # Unpack the BGRA8888 data
-    pixels = struct.unpack('<' + ('H' * (len(data) // 2)), data)
+    pixels = struct.unpack('>' + ('L' * (len(data) // 4)), data)
     # Convert the BGRA8888 values to RGBA888 format
     rgba8888_pixels = [
-            ((pixel & 0xFF000000) >> 16, (pixel & 0x00FF0000) >> 8, (pixel & 0x0000FF00), (pixel & 0x000000FF))
+            ((pixel & 0x0000FF00) >> 8, (pixel & 0x00FF0000) >> 16, (pixel & 0xFF000000) >> 24, (pixel & 0x000000FF))
             for pixel in pixels
     ]
     # Create an image from the pixels
@@ -1124,6 +1120,7 @@ def openBRGAasImage(inputFile):
     image.putdata(rgba8888_pixels)
     return image
 
+#TODO why is it all coming out yellow???
 def writeImagetoBGRAfile(image:Image, outfile:str):
     try:
         dest_file = open(outfile, "wb")
@@ -1134,7 +1131,7 @@ def writeImagetoBGRAfile(image:Image, outfile:str):
         if not pixels:
             logging.error(f"tadpole_functions~writeImagetoBGRAfile: Failed to load image")
             return False
-
+        data = []
         for h in range(image_height):
             for w in range(image_width):
                 pixel = pixels[w, h]
@@ -1145,9 +1142,10 @@ def writeImagetoBGRAfile(image:Image, outfile:str):
                 g = pixel[1]
                 b = pixel[2]
                 a = pixel[3]
-                bgra = (b << 24) | (g << 16) | (r << 8) | a
-                outfile.write(struct.pack('H', bgra))
-        outfile.close()
+                bgra = (b) | (g << 16) | (r << 8) | (a << 24)
+                data.append(struct.pack('>L', bgra))
+        dest_file.write(b''.join(data))
+        dest_file.close()
         return True
     except (OSError, IOError):
         logging.error(f"tadpole_functions~writeImagetoBGRAfile: Failed opening image file {outfile} for conversion")
