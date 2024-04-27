@@ -1,17 +1,19 @@
+import binascii
+import logging
 import os
 import re
-import binascii
 import shutil
 import struct
 
 try:
-    from PIL import Image
-    from PIL import ImageDraw
+    from PIL import Image, ImageDraw
     image_lib_avail = True
 except ImportError:
     Image = None
     ImageDraw = None
     image_lib_avail = False
+
+logger = logging.getLogger(__name__)
 
 systems = {
     "ARCADE": ["mswb7.tax", "msdtc.nec", "mfpmp.bvs"],
@@ -88,8 +90,8 @@ def sort_without_file_ext(unsorted_list):
 
 def getROMList(roms_path):
     if not os.path.isdir(roms_path):
-        print(f"! Couldn't find folder {roms_path}")
-        print("  Check the provided path points to an SF2000 SD card!")
+        logger.debug(f"! Couldn't find folder {roms_path}")
+        logger.debug("  Check the provided path points to an SF2000 SD card!")
         raise StopExecution
     files = os.scandir(roms_path)
     files = list(filter(check_rom, files))
@@ -97,7 +99,7 @@ def getROMList(roms_path):
     return filenames
 
 def process_sys(drive, system, test_mode):
-    print(f"Processing {system}")
+    logger.debug(f"Processing {system}")
 
     roms_path = os.path.join(drive,system)
     filenames = getROMList(roms_path)
@@ -109,7 +111,7 @@ def process_sys(drive, system, test_mode):
     check_and_back_up_file(index_path_cn)
     check_and_back_up_file(index_path_pinyin)
 
-    print(f"Looking for files in {roms_path}")
+    logger.debug(f"Looking for files in {roms_path}")
 
     if system != "ARCADE":
         convert_zip_image_pairs_to_zxx(roms_path, system)
@@ -118,7 +120,7 @@ def process_sys(drive, system, test_mode):
     filenames = getROMList(roms_path)
     no_files = len(filenames)
     if no_files == 0:
-        print("No ROMs found! Going to save an empty file list")
+        logger.debug("No ROMs found! Going to save an empty file list")
         #return f"No ROMs found to rebuild in {system}"
 
     stripped_names = list(map(strip_file_extension, filenames))
@@ -135,7 +137,7 @@ def process_sys(drive, system, test_mode):
     write_index_file(name_map_cn, sort_normal, index_path_cn, test_mode)
     write_index_file(name_map_pinyin, sort_normal, index_path_pinyin, test_mode)
 
-    print("Done\n")
+    logger.debug("Done\n")
     return f"Finished updating {system} with {no_files} ROMs"
 
 
@@ -154,7 +156,7 @@ def convert_zip_image_pairs_to_zxx(roms_path, system):
     sys_zxx_ext = zxx_ext[system]
     if not img_files or not zip_files:
         return
-    print(f"Found image and zip files, looking for matches to combine to {sys_zxx_ext}")
+    logger.debug(f"Found image and zip files, looking for matches to combine to {sys_zxx_ext}")
 
     imgs_processed = 0
     for img_file in img_files:
@@ -163,12 +165,12 @@ def convert_zip_image_pairs_to_zxx(roms_path, system):
             continue
         converted = convert_zip_image_to_zxx(roms_path, img_file, zip_file, sys_zxx_ext)
         if not converted:
-            print("! Aborting image processing due to errors")
+            logger.debug("! Aborting image processing due to errors")
             break
         imgs_processed += 1
 
     if imgs_processed:
-        print(f"Combined {imgs_processed} zip + image pairs into .{sys_zxx_ext} files")
+        logger.debug(f"Combined {imgs_processed} zip + image pairs into .{sys_zxx_ext} files")
 
 
 def convert_zip_image_to_zxx(path, img_file, zip_file, zxx_ext):
@@ -189,14 +191,14 @@ def convert_zip_image_to_zxx(path, img_file, zip_file, zxx_ext):
         zxx_file_handle.close()
         zip_file_handle.close()
     except (OSError, IOError):
-        print(f"! Failed appending zip file to {zxx_file_name}")
+        logger.debug(f"! Failed appending zip file to {zxx_file_name}")
         return False
 
     try:
         os.remove(img_file_path)
         os.remove(zip_file_path)
     except (OSError, IOError):
-        print(f"! Failed deleting source file(s) after creating {zxx_file_name}")
+        logger.debug(f"! Failed deleting source file(s) after creating {zxx_file_name}")
         return False
 
     return True
@@ -204,17 +206,17 @@ def convert_zip_image_to_zxx(path, img_file, zip_file, zxx_ext):
 
 def rgb565_convert(src_filename, dest_filename, dest_size=None):
     if not image_lib_avail:
-        print("! Pillow module not found, can't do image conversion")
+        logger.debug("! Pillow module not found, can't do image conversion")
         return False
     try:
         srcimage = Image.open(src_filename)
     except (OSError, IOError):
-        print(f"! Failed opening image file {src_filename} for conversion")
+        logger.debug(f"! Failed opening image file {src_filename} for conversion")
         return False
     try:
         dest_file = open(dest_filename, "wb")
     except (OSError, IOError):
-        print(f"! Failed opening destination file {dest_filename} for conversion")
+        logger.debug(f"! Failed opening destination file {dest_filename} for conversion")
         return False
     # convert the image to RGB if it was not already
     image = Image.new('RGB', srcimage.size, (0, 0, 0))
@@ -249,14 +251,14 @@ def rgb565_convert(src_filename, dest_filename, dest_size=None):
     pixels = image.load()
 
     if not pixels:
-        print(f"! Failed to load image from {src_filename}")
+        logger.debug(f"! Failed to load image from {src_filename}")
         return False
 
     for h in range(image_height):
         for w in range(image_width):
             pixel = pixels[w, h]
             if not type(pixel) is tuple:
-                print(f"! Unexpected pixel type at {w}x{h} from {src_filename}")
+                logger.debug(f"! Unexpected pixel type at {w}x{h} from {src_filename}")
                 return False
             r = pixel[0] >> 3
             g = pixel[1] >> 2
@@ -269,17 +271,17 @@ def rgb565_convert(src_filename, dest_filename, dest_size=None):
 
 def check_and_back_up_file(file_path):
     if not os.path.exists(file_path):
-        print(f"! Couldn't find game list file {file_path}")
-        print("  Check the provided path points to an SF2000 SD card!")
+        logger.debug(f"! Couldn't find game list file {file_path}")
+        logger.debug("  Check the provided path points to an SF2000 SD card!")
         raise StopExecution
 
     if not os.path.exists(f"{file_path}_orig"):
-        print(f"Backing up {file_path} as {file_path}_orig")
+        logger.debug(f"Backing up {file_path} as {file_path}_orig")
         try:
             shutil.copyfile(file_path, f"{file_path}_orig")
         except (OSError, IOError):
-            print("! Failed to copy file.")
-            print("  Check the SD card and Resources directory are writable.")
+            logger.debug("! Failed to copy file.")
+            logger.debug("  Check the SD card and Resources directory are writable.")
             raise StopExecution
 
 
@@ -308,22 +310,22 @@ def write_index_file(name_map, sort_func, index_path, test_mode):
     new_index_content = metadata_bytes + names_bytes
 
     if test_mode:
-        print(f"Checking {index_path}")
+        logger.debug(f"Checking {index_path}")
         file_handle = open(index_path, 'rb')
         existing_index_content = file_handle.read(os.path.getsize(index_path))
         file_handle.close()
         if existing_index_content != new_index_content:
-            print("! Doesn't match")
+            logger.debug("! Doesn't match")
         return
 
-    print(f"Overwriting {index_path}")
+    logger.debug(f"Overwriting {index_path}")
     try:
         file_handle = open(index_path, 'wb')
         file_handle.write(new_index_content)
         file_handle.close()
     except (IOError, OSError):
-        print("! Failed overwriting file.")
-        print("  Check the SD card and file are writable, and the file is not open in another program.")
+        logger.debug("! Failed overwriting file.")
+        logger.debug("  Check the SD card and file are writable, and the file is not open in another program.")
         raise StopExecution
 
 

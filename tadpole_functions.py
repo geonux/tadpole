@@ -1,20 +1,25 @@
 # GUI imports
-from PyQt5.QtGui import *
-from PyQt5.QtCore import *
-from PyQt5.QtWidgets import *
+import hashlib
+import json
+import logging
+
 # OS imports
 import os
 import shutil
-import hashlib
-import zipfile
-from io import BytesIO
+
 #feature imports
 import struct
-import frogtool
+import zipfile
+from io import BytesIO
+
 import requests
-import json
-import logging
-import time
+from PyQt5.QtCore import *
+from PyQt5.QtGui import *
+from PyQt5.QtWidgets import *
+
+import frogtool
+from frog_config import zxx_exts
+from utils.image_utils import create_zxx_file, load_as_qimage
 
 try:
     from PIL import Image, ImageDraw, ImageFont
@@ -24,17 +29,8 @@ except ImportError:
     ImageDraw = None
     image_lib_avail = False
 
-# This dictionary is in the following format:
-# "System": []
-systems = {  
-    "FC":     ["rdbui.tax", "fhcfg.nec", "nethn.bvs",1],
-    "SFC":    ["urefs.tax", "adsnt.nec", "xvb6c.bvs",2],
-    "MD":     ["scksp.tax", "setxa.nec", "wmiui.bvs",3],
-    "GB":     ["vdsdc.tax", "umboa.nec", "qdvd6.bvs",4],
-    "GBC":    ["pnpui.tax", "wjere.nec", "mgdel.bvs",5],
-    "GBA":    ["vfnet.tax", "htuiw.nec", "sppnp.bvs",6], 
-    "ARCADE": ["mswb7.tax", "msdtc.nec", "mfpmp.bvs",7]
-}
+logger = logging.getLogger(__name__)
+
 
 supported_save_ext = [
     "sav", "sa0", "sa1", "sa2", "sa3"
@@ -542,7 +538,7 @@ def getGameShortcutPosition(drive, console, game):
         # see if this game is listed.  If so get its position
         for i, gameShortcutLine in enumerate(lines):
             if gameShortcutLine == savedShortcut:
-                print("Found " + savedShortcut + "as shortcut")
+                logger.debug("Found " + savedShortcut + "as shortcut")
                 #now we found the match of the raw location, now we need to return the position from console
                 #from xfgle, the positions start with 3 random lines, and then go down in order from FC -> SNES -> ... -> Arcade
                 if(console == "FC" ):
@@ -561,7 +557,7 @@ def getGameShortcutPosition(drive, console, game):
                     return (i - 27)
         return 0      
     except (OSError, IOError):
-        print(f"! Failed changing the shortcut file")
+        logger.debug(f"! Failed changing the shortcut file")
         return 0
 
 #Although not required, if you don't have seperate prefixes, games with same ROM names/extension
@@ -715,7 +711,7 @@ def changeTheme(drive_path: str, url: str = "", file: str = "", progressBar: QPr
                 if len(zip.infolist()) > 55:
                     return False
                 for zip_info in zip.infolist():     
-                    #print(zip_info)
+                    #logger.debug(zip_info)
                     if zip_info.is_dir():
                         continue
                     zip_info.filename = os.path.basename(zip_info.filename)
@@ -740,7 +736,7 @@ def changeTheme(drive_path: str, url: str = "", file: str = "", progressBar: QPr
                 progressBar.setMaximum(len(zip.infolist()))
                 progress = 2
                 for zip_info in zip.infolist():     
-                    #print(zip_info)
+                    #logger.debug(zip_info)
                     if zip_info.is_dir():
                         continue
                     zip_info.filename = os.path.basename(zip_info.filename)
@@ -765,7 +761,7 @@ def downloadAndReplace(drivePath, fileToReplace, url=""):
         # retrieve bgm from GitHub resources
         content = ""
         if not url == "":
-            print(f"Downloading {fileToReplace} from {url}")
+            logger.debug(f"Downloading {fileToReplace} from {url}")
             content = requests.get(url).content
 
         if not content == "":
@@ -774,10 +770,10 @@ def downloadAndReplace(drivePath, fileToReplace, url=""):
             file_handle = open(bgmPath, 'wb') #rb for read, wb for write
             file_handle.write(content)
             file_handle.close()
-        print ("Finished download and replace successfully")
+        logger.debug ("Finished download and replace successfully")
         return True
     except (OSError, IOError) as error:
-        print("An error occured while trying to download and replace a file.")
+        logger.debug("An error occured while trying to download and replace a file.")
         return False
       
 def downloadDirectoryFromGithub(location, url, progressBar):
@@ -791,7 +787,7 @@ def downloadDirectoryFromGithub(location, url, progressBar):
                 #create folder then recursively download
                 foldername = item["name"]
                 destination = os.path.join(location,foldername)
-                print(f"creating directory if it doesnt exist {destination}")
+                logger.debug(f"creating directory if it doesnt exist {destination}")
                 os.makedirs(destination, exist_ok=True)
                 downloadDirectoryFromGithub(destination, item["url"], progressBar)
             else:# all other cases should be files
@@ -810,14 +806,14 @@ def downloadFileFromGithub(outFile, url):
         response = requests.get(url)
         if response.status_code == 200:
             with open(outFile, 'wb') as f:
-                print(f'downloading {url} to {outFile}')
+                logger.debug(f'downloading {url} to {outFile}')
                 f.write(response.content)
             return True
         else:
-            print("Error when trying to download a file from Github. Response was not code 200")
+            logger.debug("Error when trying to download a file from Github. Response was not code 200")
             raise InvalidURLError
     except Exception as e:
-        print(str(e))
+        logger.debug(str(e))
         return False
 
 """
@@ -841,7 +837,7 @@ def downloadAndExtractZIP(root, url, progress):
 
 def downloadAndExtractZIPBar(root, url, progress):
     try:
-        logging.info(f"tadpole_functions~downloadAndExtractZIPBar: Downloading ({url}) to extract to ({root})")
+        logger.info(f"tadpole_functions~downloadAndExtractZIPBar: Downloading ({url}) to extract to ({root})")
         response = requests.get(url, stream=True)
         total_length = int(response.headers.get('content-length'))
         dl = 0
@@ -851,7 +847,7 @@ def downloadAndExtractZIPBar(root, url, progress):
                 dl += len(data)
                 zip_in_memory.extend(data)  
                 progress.showProgress(int(100 * dl / total_length), True)
-        logging.info(f"tadpole_functions~downloadAndExtractZIPBar: Received {response.status_code} for ({url})")
+        logger.info(f"tadpole_functions~downloadAndExtractZIPBar: Received {response.status_code} for ({url})")
         if response.status_code == 200:
             progress.setText("Extracting")
             progress.showProgress(0, True)
@@ -860,10 +856,10 @@ def downloadAndExtractZIPBar(root, url, progress):
             progress.showProgress(100, True)       
             return True
         else: 
-            logging.error("tadpole_functions~downloadAndExtractZIPBar: Problem when trying to download a file from Github. Response was not code 200")
+            logger.error("tadpole_functions~downloadAndExtractZIPBar: Problem when trying to download a file from Github. Response was not code 200")
             raise InvalidURLError
     except Exception as e:
-        logging.error(f"tadpole_functions~downloadAndExtractZIPBar: ERROR {str(e)}")
+        logger.error(f"tadpole_functions~downloadAndExtractZIPBar: ERROR {str(e)}")
     return False
 
 #Keeping this for now as a failsafe, but should remove it to follow the new design structure
@@ -901,15 +897,15 @@ def emptyFavourites(drive) -> bool:
     return emptyFile(os.path.join(drive, "Resources", "Favorites.bin"))
     
 def emptyFile(path) -> bool:
-    print(f"Deleting file {path}")
+    logger.debug(f"Deleting file {path}")
     try:      
         if os.path.isfile(path):
             os.remove(path)
         else:
-            print("File not found, guess thats still a success? @Goldstein to check the spelling if this is a bug")
+            logger.debug("File not found, guess thats still a success? @Goldstein to check the spelling if this is a bug")
         return True
     except:
-        print("Error while trying to delete a file")
+        logger.debug("Error while trying to delete a file")
     return False
 
 def emptyHistory(drive) -> bool:
@@ -934,10 +930,10 @@ def extractFileNameFromZFB(romFilePath):
                 i += 1
             #rom_content = bytearray(rom_file.read(907))
             fileName = rom_name_content.decode()
-            logging.info(f"({fileName}) decoded from ZFB")
+            logger.info(f"({fileName}) decoded from ZFB")
             return fileName
     except Exception as e:
-        logging.error(f"tadpole_functions~extractFileNameFromZFB: error {str(e)}")
+        logger.error(f"tadpole_functions~extractFileNameFromZFB: error {str(e)}")
         return ''
 
 #Thanks DTeyn for the code!: https://github.com/Dteyn/ZFBTool/blob/master/ZFBTool.pyw
@@ -985,22 +981,22 @@ def createZFBFile(drive, pngPath, romPath):
 
 
 def deleteROM(ROMfilePath):
-    logging.info(f"Tadpole_functions~ Deleting ROM: {ROMfilePath}")
+    logger.info(f"Tadpole_functions~ Deleting ROM: {ROMfilePath}")
     ext = os.path.splitext(ROMfilePath)[1]   
     if(ext == ".zfb"): #ROM is arcade, need to also delete the zip file in bin
-        print("Arcade ROM")
+        logger.debug("Arcade ROM")
         base = os.path.dirname(ROMfilePath)
         arcadezip = extractFileNameFromZFB(ROMfilePath)
         try:
             os.remove(os.path.join(base,"bin",arcadezip))
         except:
-            logging.error(f"ERROR: tadpole_functions~deleteROM: failed to delete arcadezip ({ROMfilePath})")
+            logger.error(f"ERROR: tadpole_functions~deleteROM: failed to delete arcadezip ({ROMfilePath})")
             # We dont return False here because the main point is to delete the provided ROMfilePath file
     # Delete the zxx file
     try:
         os.remove(ROMfilePath)
     except:
-        logging.error(f"ERROR: tadpole_functions~deleteROM: failed to delete provided ROM file ({ROMfilePath})") 
+        logger.error(f"ERROR: tadpole_functions~deleteROM: failed to delete provided ROM file ({ROMfilePath})") 
         return False   
     return True          
           
@@ -1018,8 +1014,8 @@ def GBABIOSFix(drive: str):
         raise Exception_InvalidPath
     gba_bios_path = os.path.join(drive, "bios", "gba_bios.bin")
     if not os.path.exists(gba_bios_path):
-        print(f"! Couldn't find game list file {gba_bios_path}")
-        print("  Check the provided path points to an SF2000 SD card!")
+        logger.debug(f"! Couldn't find game list file {gba_bios_path}")
+        logger.debug("  Check the provided path points to an SF2000 SD card!")
         raise Exception_InvalidPath
     try:
         gba_folder_path = os.path.join(drive, "GBA", "mnt", "sda1", "bios")
@@ -1029,18 +1025,18 @@ def GBABIOSFix(drive: str):
         shutil.copyfile(gba_bios_path, os.path.join(gba_folder_path, "gba_bios.bin"))
         shutil.copyfile(gba_bios_path, os.path.join(roms_folder_path, "gba_bios.bin"))
     except (OSError, IOError) as error:
-        print("! Failed to copy GBA BIOS.")
-        print(error)
+        logger.debug("! Failed to copy GBA BIOS.")
+        logger.debug(error)
         raise Exception_InvalidPath
  
 def downloadROMArt(console : str, ROMpath : str, game : str, artType: str, realname : str):
 
     outFile = os.path.join(os.path.dirname(ROMpath),f"{realname}.png")
     if(downloadFileFromGithub(outFile,ROMART_baseURL + ROMArt_console[console] + artType + game)):
-        print(' Downloaded ' + realname + ' ' + ' thumbnail')
+        logger.debug(' Downloaded ' + realname + ' ' + ' thumbnail')
         return True    
     else:
-        print(' Could not downlaod ' + realname + ' ' + ' thumbnail')
+        logger.debug(' Could not downlaod ' + realname + ' ' + ' thumbnail')
         return True  
     
 def stripShortcutText(drive: str):
@@ -1062,7 +1058,7 @@ def stripShortcutText(drive: str):
         gakne.close()
         return True
     except (OSError, IOError) as e:
-        print(f"! Failed striping shortcut labels. {e}")
+        logger.debug(f"! Failed striping shortcut labels. {e}")
         return False
 
 _static_shortcut_FC = 0
@@ -1099,7 +1095,7 @@ def updateShortcutTextforConsole(drive: str, console: int, game1:str, game2:str,
         writeImagetoBGRAfile(shortcutText, gakne_path)
         return True
     except (OSError, IOError) as e:
-        print(f"! Failed updating shortcut labels. {e}")
+        logger.debug(f"! Failed updating shortcut labels. {e}")
         return False
 
 def openBRGAasImage(inputFile):
@@ -1129,14 +1125,14 @@ def writeImagetoBGRAfile(image:Image, outfile:str):
         pixels = image.load()
 
         if not pixels:
-            logging.error(f"tadpole_functions~writeImagetoBGRAfile: Failed to load image")
+            logger.error(f"tadpole_functions~writeImagetoBGRAfile: Failed to load image")
             return False
         data = []
         for h in range(image_height):
             for w in range(image_width):
                 pixel = pixels[w, h]
                 if not type(pixel) is tuple:
-                    logging.error(f"! Unexpected pixel type at {w}x{h} from {outfile}")
+                    logger.error(f"! Unexpected pixel type at {w}x{h} from {outfile}")
                     return False
                 r = pixel[0]
                 g = pixel[1]
@@ -1148,7 +1144,7 @@ def writeImagetoBGRAfile(image:Image, outfile:str):
         dest_file.close()
         return True
     except (OSError, IOError):
-        logging.error(f"tadpole_functions~writeImagetoBGRAfile: Failed opening image file {outfile} for conversion")
+        logger.error(f"tadpole_functions~writeImagetoBGRAfile: Failed opening image file {outfile} for conversion")
         return False
 
 
@@ -1160,17 +1156,17 @@ def createSaveBackup(drive: str, zip_file_name):
             for root, dirs, files in os.walk(drive):
                 for file in files:
                     if check_is_save_file(file):
-                        print(f"Found save: {file} in {root}")
+                        logger.debug(f"Found save: {file} in {root}")
                         try:
                             zip_object.write(os.path.join(root, file),
                                 os.path.relpath(os.path.join(root, file),
                                                 os.path.join(drive, '..')))
                         except Exception as e:
-                            print(f"Bad zip file encountered: {os.path.join(root, file)}")
+                            logger.debug(f"Bad zip file encountered: {os.path.join(root, file)}")
                             continue
         return True
     except Exception as e:
-        logging.error({e})
+        logger.error({e})
         return False
                      
 def check_is_save_file(filename):
