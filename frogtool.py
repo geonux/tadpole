@@ -3,43 +3,53 @@ import logging
 import os
 import re
 import shutil
-import struct
-
-try:
-    from PIL import Image, ImageDraw
-    image_lib_avail = True
-except ImportError:
-    Image = None
-    ImageDraw = None
-    image_lib_avail = False
 
 logger = logging.getLogger(__name__)
 
 systems = {
     "ARCADE": ["mswb7.tax", "msdtc.nec", "mfpmp.bvs"],
-    "FC":     ["rdbui.tax", "fhcfg.nec", "nethn.bvs"],
-    "GB":     ["vdsdc.tax", "umboa.nec", "qdvd6.bvs"],
-    "GBA":    ["vfnet.tax", "htuiw.nec", "sppnp.bvs"],
-    "GBC":    ["pnpui.tax", "wjere.nec", "mgdel.bvs"],
-    "MD":     ["scksp.tax", "setxa.nec", "wmiui.bvs"],
-    "SFC":    ["urefs.tax", "adsnt.nec", "xvb6c.bvs"]
+    "FC": ["rdbui.tax", "fhcfg.nec", "nethn.bvs"],
+    "GB": ["vdsdc.tax", "umboa.nec", "qdvd6.bvs"],
+    "GBA": ["vfnet.tax", "htuiw.nec", "sppnp.bvs"],
+    "GBC": ["pnpui.tax", "wjere.nec", "mgdel.bvs"],
+    "MD": ["scksp.tax", "setxa.nec", "wmiui.bvs"],
+    "SFC": ["urefs.tax", "adsnt.nec", "xvb6c.bvs"],
 }
 
 supported_rom_ext = [
-    "bkp", "zip", "zfc", "zsf", "zmd", "zgb", "zfb", "smc", "fig", "sfc", "gd3", "gd7", "dx2", "bsx", "swc", "nes",
-    "nfc", "fds", "unf", "gba", "agb", "gbz", "gbc", "gb", "sgb", "bin", "md", "smd", "gen", "sms"
-]
-zxx_ext = {
-    "ARCADE": "zfb", "FC": "zfc", "GB": "zgb", "GBA": "zgb", "GBC": "zgb", "MD": "zmd", "SFC": "zsf"
-}
-supported_img_ext = [
-    "png", "jpg", "jpeg", "gif"
-]
-supported_zip_ext = [
-    "bkp", "zip"
+    "bkp",
+    "zip",
+    "zfc",
+    "zsf",
+    "zmd",
+    "zgb",
+    "zfb",
+    "smc",
+    "fig",
+    "sfc",
+    "gd3",
+    "gd7",
+    "dx2",
+    "bsx",
+    "swc",
+    "nes",
+    "nfc",
+    "fds",
+    "unf",
+    "gba",
+    "agb",
+    "gbz",
+    "gbc",
+    "gb",
+    "sgb",
+    "bin",
+    "md",
+    "smd",
+    "gen",
+    "sms",
 ]
 
-defaultThumbnailSize = (144, 208)
+supported_zip_ext = ["bkp", "zip"]
 
 
 class StopExecution(Exception):
@@ -62,10 +72,6 @@ def check_file(file_entry, supported_exts):
 
 def check_rom(file_entry):
     return check_file(file_entry, supported_rom_ext)
-
-
-def check_img(file_entry):
-    return check_file(file_entry, supported_img_ext)
 
 
 def check_zip(file_entry):
@@ -98,30 +104,28 @@ def getROMList(roms_path):
     filenames = list(map(file_entry_to_name, files))
     return filenames
 
+
 def process_sys(drive, system, test_mode):
     logger.debug(f"Processing {system}")
 
-    roms_path = os.path.join(drive,system)
+    roms_path = os.path.join(drive, system)
     filenames = getROMList(roms_path)
 
-    index_path_files = os.path.join(drive,"Resources",systems[system][0])
-    index_path_cn = os.path.join(drive,"Resources",systems[system][1])
-    index_path_pinyin = os.path.join(drive,"Resources",systems[system][2])
+    index_path_files = os.path.join(drive, "Resources", systems[system][0])
+    index_path_cn = os.path.join(drive, "Resources", systems[system][1])
+    index_path_pinyin = os.path.join(drive, "Resources", systems[system][2])
     check_and_back_up_file(index_path_files)
     check_and_back_up_file(index_path_cn)
     check_and_back_up_file(index_path_pinyin)
 
     logger.debug(f"Looking for files in {roms_path}")
 
-    if system != "ARCADE":
-        convert_zip_image_pairs_to_zxx(roms_path, system)
-
-    #Bugfix: get new filenames now that we have converted from zip to zxx
+    # Bugfix: get new filenames now that we have converted from zip to zxx
     filenames = getROMList(roms_path)
     no_files = len(filenames)
     if no_files == 0:
         logger.debug("No ROMs found! Going to save an empty file list")
-        #return f"No ROMs found to rebuild in {system}"
+        # return f"No ROMs found to rebuild in {system}"
 
     stripped_names = list(map(strip_file_extension, filenames))
 
@@ -147,126 +151,6 @@ def find_matching_file_diff_ext(target, files):
         file_no_ext = strip_file_extension(file.name)
         if file_no_ext == target_no_ext:
             return file
-
-def convert_zip_image_pairs_to_zxx(roms_path, system):
-    img_files = os.scandir(roms_path)
-    img_files = list(filter(check_img, img_files))
-    zip_files = os.scandir(roms_path)
-    zip_files = list(filter(check_zip, zip_files))
-    sys_zxx_ext = zxx_ext[system]
-    if not img_files or not zip_files:
-        return
-    logger.debug(f"Found image and zip files, looking for matches to combine to {sys_zxx_ext}")
-
-    imgs_processed = 0
-    for img_file in img_files:
-        zip_file = find_matching_file_diff_ext(img_file, zip_files)
-        if not zip_file:
-            continue
-        converted = convert_zip_image_to_zxx(roms_path, img_file, zip_file, sys_zxx_ext)
-        if not converted:
-            logger.debug("! Aborting image processing due to errors")
-            break
-        imgs_processed += 1
-
-    if imgs_processed:
-        logger.debug(f"Combined {imgs_processed} zip + image pairs into .{sys_zxx_ext} files")
-
-
-def convert_zip_image_to_zxx(path, img_file, zip_file, zxx_ext):
-
-    img_file_path = os.path.join(path,img_file.name)
-    zip_file_path = os.path.join(path,zip_file.name)
-    zxx_file_name = f"{strip_file_extension(img_file.name)}.{zxx_ext}"
-    zxx_file_path = os.path.join(path,zxx_file_name)
-
-    converted = rgb565_convert(img_file_path, zxx_file_path, defaultThumbnailSize)
-    if not converted:
-        return False
-
-    try:
-        zxx_file_handle = open(zxx_file_path, "ab")
-        zip_file_handle = open(zip_file_path, "rb")
-        zxx_file_handle.write(zip_file_handle.read())
-        zxx_file_handle.close()
-        zip_file_handle.close()
-    except (OSError, IOError):
-        logger.debug(f"! Failed appending zip file to {zxx_file_name}")
-        return False
-
-    try:
-        os.remove(img_file_path)
-        os.remove(zip_file_path)
-    except (OSError, IOError):
-        logger.debug(f"! Failed deleting source file(s) after creating {zxx_file_name}")
-        return False
-
-    return True
-
-
-def rgb565_convert(src_filename, dest_filename, dest_size=None):
-    if not image_lib_avail:
-        logger.debug("! Pillow module not found, can't do image conversion")
-        return False
-    try:
-        srcimage = Image.open(src_filename)
-    except (OSError, IOError):
-        logger.debug(f"! Failed opening image file {src_filename} for conversion")
-        return False
-    try:
-        dest_file = open(dest_filename, "wb")
-    except (OSError, IOError):
-        logger.debug(f"! Failed opening destination file {dest_filename} for conversion")
-        return False
-    # convert the image to RGB if it was not already
-    image = Image.new('RGB', srcimage.size, (0, 0, 0))
-    image.paste(srcimage, None)
-
-    if dest_size and image.size != dest_size:
-        ratio = dest_size[1] / dest_size[0]
-        if ((image.size[0] * ratio) > image.size[1]):
-            width = image.size[1]/ratio
-            left = int((image.size[0] - width)/2)
-            image = image.crop((left, 0, left + width, image.size[1]))
-        else:
-            height = image.size[0]*ratio
-            top = int((image.size[1] - height)/2)
-            image = image.crop((0, top, image.size[0], top + height))
-
-        # new_size=(144, 208)
-        # fill_color=(0, 0, 0, 0)
-        # size_x = max(dest_size[0], x)
-        # size_y = max(dest_size[1], y)
-        # new_im = Image.new('RGB', (new_size[0], new_size[1]), fill_color)
-        # new_im.paste(image, (int((size_x - x) / 2), int((size_y - y) / 2)))
-        # image = new_im
-        # TODO Let user pick if they want to stretch or not
-        #image = image.scaled(144, 208, Qt.KeepAspectRatio, Qt.SmoothTransformation) #Rescale new boot logo to correct size
-        image = image.resize(dest_size)
-        #maxsize = (144, 208)
-        #image = image.thumbnail(maxsize) 
-
-    image_height = image.size[1]
-    image_width = image.size[0]
-    pixels = image.load()
-
-    if not pixels:
-        logger.debug(f"! Failed to load image from {src_filename}")
-        return False
-
-    for h in range(image_height):
-        for w in range(image_width):
-            pixel = pixels[w, h]
-            if not type(pixel) is tuple:
-                logger.debug(f"! Unexpected pixel type at {w}x{h} from {src_filename}")
-                return False
-            r = pixel[0] >> 3
-            g = pixel[1] >> 2
-            b = pixel[2] >> 3
-            rgb = (r << 11) | (g << 5) | b
-            dest_file.write(struct.pack('H', rgb))
-    dest_file.close()
-    return True
 
 
 def check_and_back_up_file(file_path):
@@ -296,7 +180,7 @@ def write_index_file(name_map, sort_func, index_path, test_mode):
         display_name = name_map[filename]
         current_pointer = len(names_bytes)
         pointers_by_name[display_name] = current_pointer
-        names_bytes += display_name.encode('utf-8') + chr(0).encode('utf-8')
+        names_bytes += display_name.encode("utf-8") + chr(0).encode("utf-8")
 
     # build the metadata - first value is the total count of games in this list
     metadata_bytes = int_to_4_bytes_reverse(len(name_map))
@@ -311,7 +195,7 @@ def write_index_file(name_map, sort_func, index_path, test_mode):
 
     if test_mode:
         logger.debug(f"Checking {index_path}")
-        file_handle = open(index_path, 'rb')
+        file_handle = open(index_path, "rb")
         existing_index_content = file_handle.read(os.path.getsize(index_path))
         file_handle.close()
         if existing_index_content != new_index_content:
@@ -320,17 +204,16 @@ def write_index_file(name_map, sort_func, index_path, test_mode):
 
     logger.debug(f"Overwriting {index_path}")
     try:
-        file_handle = open(index_path, 'wb')
+        file_handle = open(index_path, "wb")
         file_handle.write(new_index_content)
         file_handle.close()
     except (IOError, OSError):
         logger.debug("! Failed overwriting file.")
-        logger.debug("  Check the SD card and file are writable, and the file is not open in another program.")
+        logger.debug(
+            "  Check the SD card and file are writable, and the file is not open in another program."
+        )
         raise StopExecution
 
 
 def check_sys_valid(system):
     return system and (system in systems.keys() or system == "ALL")
-
-
-
