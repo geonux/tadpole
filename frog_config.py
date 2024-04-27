@@ -7,6 +7,7 @@ from utils.image_utils import (
     get_bytes_from_qimage,
     load_as_qimage,
     replace_thumb_in_zxx,
+    resize_qimage,
 )
 
 # Resources
@@ -55,6 +56,9 @@ frog_systems = {
             ["mswb7.tax", "msdtc.nec", "mfpmp.bvs", "hctml.ers", "apisa.dlk", "msgsm.dll",],  # Menu entry #6 : #ARCADE
             ["NONE", "NONE.nec", "NONE.bvs", "", "", ""],  # Menu entry #7 :
             ["", "", "", "", "dsuei.cpl", "qasf.bel"],  # Users ROMS
+        ],
+        "bios": [
+            
         ]
     },
     "GB300":{
@@ -156,13 +160,16 @@ class FrogConfig:
         return os.path.join(self.frog_root_path, system[0])
 
     def _zxx_ext_for(self, rom_ext):
-        for zxx_ext, roms_ext in zxx_exts:
+        for zxx_ext, roms_ext in zxx_exts.items():
             if rom_ext in roms_ext:
                 return zxx_ext
+        return list(zxx_exts.keys())[0]
 
     def create_or_edit_zxx_file(self, system, rom_path, qimage, ovewrite):
         rom_fullname = os.path.basename(rom_path)
         rom_name, rom_ext = os.path.splitext(rom_fullname)
+
+        qimage = resize_qimage(qimage, self.thumb_size, crop=True)
 
         if rom_ext[1:] in zxx_exts.keys() and ovewrite:
             # We replace the old thumbnail with the new one
@@ -177,6 +184,7 @@ class FrogConfig:
                 self.thumb_size,
                 self.image_format,
             )
+
 
 
 frog_config = FrogConfig()

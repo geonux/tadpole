@@ -1,10 +1,11 @@
-import logging
-from PyQt5.QtGui import QImage
-from PyQt5.QtCore import Qt, QSize
-from os.path import splitext, basename, join
-from typing import Optional, Tuple
 import io
+import logging
 import zipfile
+from os.path import basename, join, splitext
+from typing import Optional, Tuple
+
+from PyQt5.QtCore import QSize, Qt
+from PyQt5.QtGui import QImage
 
 known_image_size = [
     # SF2000
@@ -19,6 +20,7 @@ known_image_size = [
     (853, 392),
 ]
 
+image_exts = [".png", ";jpg", ".jpeg", ".bmp", ".gif", ".tiff", ".tif", ".webp"]
 
 def bytes_per_pixel(qimage_format: int) -> int:
     """
@@ -82,11 +84,7 @@ def load_as_qimage(
         image_content = image_fp
 
     # if image_fp have an unknown extension, read it as bytes
-    if isinstance(image_fp, str) and splitext(image_fp)[1] not in [
-        ".jpg",
-        ".png",
-        ".webp",
-    ]:
+    if isinstance(image_fp, str) and splitext(image_fp)[1] not in image_exts:
         with open(image_fp, "rb") as f:
             image_content = f.read()
 
@@ -193,8 +191,7 @@ def create_zxx_file(
             zxx_fp.write(zip_buffer.getvalue())
         else:
             # if already zipped, just copy content
-            with open(rom_path) as rom_fp:
+            with open(rom_path, "rb") as rom_fp:
                 zxx_fp.write(rom_fp.read())
 
     logging.info(f"Zxx file `{dest_zxx_path}` created successfully.")
-

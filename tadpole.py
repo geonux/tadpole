@@ -62,10 +62,6 @@ tpConf = TadpoleConfig()
 
 def full_rebuild_rom_list(frog_root_path: str, systems: list[any]):
     """Give progress to user if rebuilding has hundreds of ROMS
-
-    Args:
-        frog_root_path (str): _description_
-        systems (list): _description_
     """    
     rebuildingmsgBox = DownloadProgressDialog()
     rebuildingmsgBox.progress.reset()
@@ -98,7 +94,7 @@ def RunFrogTool(drive, frog_item):
 
     print(f"Running frogtool with drive ({drive}) and consoles ({frog_item[0]})")
     logging.info(f"Running frogtool with drive ({drive}) and console ({frog_item[0]})")
-    result = frogtool.process_sys(drive, frog_item, False)
+    result = frogtool.process_sys(drive, frog_item[0], False)
     print("Result " + result)      
     #Always reload the table now that the folders are all cleaned up
     window.loadROMsToTable()
@@ -422,7 +418,7 @@ class MainWindow (QMainWindow):
         print(f"clicked Cell for ({clickedRow},{clickedColumn})")
         objGame = self.ROMList[clickedRow]
         if self.tbl_gamelist.horizontalHeaderItem(clickedColumn).text() == self._static_columns_Thumbnail:  
-            self.viewThumbnail(objGame.ROMlocation)
+            self.edit_thumbnail(objGame.ROMlocation)
         elif self.tbl_gamelist.horizontalHeaderItem(clickedColumn).text() == self._static_columns_Delete: 
             self.deleteROM(objGame.ROMlocation)
         #Only enable deleting when selcted
@@ -472,11 +468,14 @@ class MainWindow (QMainWindow):
             current_drive = self.combobox_drive.currentText()
             self.combobox_drive.clear()
             localdrive = tpConf.getLocalUserDirectory()
-            #Check whether a local drive is configured.
-            if localdrive != tpConf._static_general_userDirectory_DEFAULT:
-                self.combobox_drive.addItem(QIcon(self.style().standardIcon(QStyle.StandardPixmap.SP_DriveHDIcon)),
-                                                localdrive,
-                                                localdrive)
+
+            # Check if local drive exists
+            if os.path.exists(localdrive):
+                #Check whether a local drive is configured.
+                if localdrive:
+                    self.combobox_drive.addItem(QIcon(self.style().standardIcon(QStyle.StandardPixmap.SP_DriveHDIcon)),
+                                                    localdrive,
+                                                    localdrive)
             #Load in all mounted partitions that look Froggy
             for drive in psutil.disk_partitions():
                 if(tadpole_functions.checkDriveLooksFroggy(drive.mountpoint)):
@@ -485,7 +484,7 @@ class MainWindow (QMainWindow):
                                                 drive.mountpoint)
 
             # Check if at least one frog drive is also configured. local + frog will mean at least 2 drives.
-            if localdrive != tpConf._static_general_userDirectory_DEFAULT and len(self.combobox_drive) > 1:
+            if localdrive and len(self.combobox_drive) > 1:
                 self.btn_coppy_user_selected_button.setEnabled(True)
             else:
                 self.btn_coppy_user_selected_button.setEnabled(False)
@@ -798,26 +797,24 @@ from tzlion on frogtool. Special thanks also goes to wikkiewikkie & Jason Grieve
             QMessageBox.about(self, "Failure","Firmware was not patched with the battery improvements.  Are you already up to date?")
         UpdateMsgBox.close()
 
-    def viewThumbnail(self, rom_path):
-        logging.info(f"Tadpole~viewThumbnail: ({rom_path})")
-        self.window_thumbnail = ThumbnailDialog(rom_path)  
-        result = self.window_thumbnail.exec()
-        drive = self.combobox_drive.currentText()
-        system = self.combobox_console.currentText()
-        if result:
-            newLogoFileName = self.window_thumbnail.new_viewer.path
-            print(f"user tried to load image: {newLogoFileName}")
-            if newLogoFileName is None or newLogoFileName == "":
-                print("user cancelled image select")
-                return
-            if tadpole_functions.addThumbnail(rom_path, drive, system, newLogoFileName, True):
-                QMessageBox.about(self, "Change ROM Logo", "ROM thumbnails successfully changed")
-                RunFrogTool(drive,system)
-                return True
-            else:
-                QMessageBox.about(self, "Change ROM Cover", "Unable to convert thumbnail for ROM")
-                RunFrogTool(drive,system)
-                return False
+    def edit_thumbnail(self, rom_path):
+        try:
+            thumb_qimage = get_qimage_from_zxx(rom_path, frog_config.thumb_size, frog_config.image_format)
+        except ValueError as e:
+            logging.error(e)
+            thumb_qimage = None
+
+        dialog = ImageChangeDialog(f"Thumbnail - {rom_path}", thumb_qimage, frog_config.thumb_size, frog_config.image_format)
+        status = dialog.exec()
+        if status:
+            new_thumb = dialog.get_new_image()
+            frog_config.create_or_edit_zxx_file(self.combobox_console.currentData(), rom_path, new_thumb, True)
+         
+            # TODO Change way to launch frogtool
+            RunFrogTool(self.combobox_drive.currentText(), self.combobox_console.currentData())
+
+            QMessageBox.about(self, "Change ROM Logo", "ROM thumbnails successfully changed")
+
 
     def formatAndDownloadOSFiles(self):
         logging.error(f"tadpole~formatAndDownloadOSFiles: Prompting use to select a foramtted drive")
@@ -1286,7 +1283,6 @@ Note: You can change in settings to either pick your own or try to downlad autom
     def loadROMsToTable(self):
         drive = self.combobox_drive.currentText()
         system = self.combobox_console.currentText()
-        print(f"loading roms to table for ({drive}) ({system})")
         logging.info(f"loading roms to table for ({drive}) ({system})")
         msgBox = DownloadProgressDialog()
         msgBox.setText(" Loading "+ system + " ROMS...")

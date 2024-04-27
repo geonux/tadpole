@@ -1,9 +1,9 @@
 # GUI imports
-from PyQt5.QtWidgets import *
-from PyQt5.QtGui import QIcon, QPixmap, QImage
 from PyQt5.QtCore import Qt
+from PyQt5.QtGui import QIcon, QImage, QPixmap
+from PyQt5.QtWidgets import *
 
-from utils.image_utils import load_as_qimage, get_bytes_from_qimage
+from utils.image_utils import get_bytes_from_qimage, image_exts, load_as_qimage
 
 
 class ImageChangeDialog(QDialog):
@@ -44,7 +44,7 @@ class ImageChangeDialog(QDialog):
             self.current_img = image_fp
         else:
             self.current_img = load_as_qimage(image_fp, image_size, image_format)
-        
+
         if not self.current_img.isNull():
             current_viewer.setPixmap(QPixmap().fromImage(self.current_img))
 
@@ -83,8 +83,10 @@ class ImageChangeDialog(QDialog):
         layout_buttons.addWidget(button_cancel)
 
     def get_bytes_for_new_image(self):
-        return get_bytes_from_qimage(self.new_viewer.pixmap().toImage(), self.image_format)
-    
+        return get_bytes_from_qimage(
+            self.new_viewer.pixmap().toImage(), self.image_format
+        )
+
     def get_new_image(self) -> QImage:
         return self.new_viewer.pixmap().toImage()
 
@@ -99,11 +101,12 @@ class ImageChangeDialog(QDialog):
 
     def _new_viewer_clicked(self):
         # Prompts user for image path and loads same.
+        exts_pattern = " ".join(["*" + ext for ext in image_exts])
         file_name = QFileDialog.getOpenFileName(
             self,
             "Open file",
             None,
-            "Images (*.jpg *.png *.webp);;RAW (RGB565 Little Endian) Images (*.*)",
+            f"Images ({exts_pattern});;RAW Images (*.*)",
         )[0]
         if len(file_name) > 0:  # confirm if user selected a file
             img = load_as_qimage(file_name, self.image_size, self.image_format)
