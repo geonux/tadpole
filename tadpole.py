@@ -53,7 +53,6 @@ import subprocess
 
 basedir = os.path.dirname(__file__)
 static_NoDrives = "N/A"
-static_AllSystems = "ALL"
 
 
 #Use this to poll for SD cards, turn it to False to stop polling
@@ -61,37 +60,49 @@ poll_drives = True
 
 tpConf = TadpoleConfig()
 
-def RunFrogTool(drive, console):
+def full_rebuild_rom_list(frog_root_path: str, systems: list[any]):
+    """Give progress to user if rebuilding has hundreds of ROMS
+
+    Args:
+        frog_root_path (str): _description_
+        systems (list): _description_
+    """    
+    rebuildingmsgBox = DownloadProgressDialog()
+    rebuildingmsgBox.progress.reset()
+    rebuildingmsgBox.setText("Rebuilding roms...")
+    rebuildingmsgBox.showProgress(progress, True)
+    rebuildingmsgBox.show()
+
+    progress = 0
+    inc = 100 / len(systems)
+    
+    rebuildingmsgBox.showProgress(progress, True)
+    for system in systems:
+        result = frogtool.process_sys(frog_root_path, system, False)
+        #Update Progress
+        progress += inc
+        rebuildingmsgBox.showProgress(progress, True)
+
+    #TODO: eventually we could return a total roms across all systems, but not sure users will care
+    rebuildingmsgBox.close()
+
+    # reload the table now that the folders are all cleaned up
+    window.loadROMsToTable()
+    
+    QMessageBox.about(window, "Result", "Rebuilt all ROMS for all systems")
+
+def RunFrogTool(drive, frog_item):
     if drive == 'N/A':
         logging.warning("You are trying to run froggy with no drive.")
         return
-    print(f"Running frogtool with drive ({drive}) and console ({console})")
-    logging.info(f"Running frogtool with drive ({drive}) and console ({console})")
-    try:
-        #TODO: should probably replace this with rebuilding the favourites list at some point
-        if(console == static_AllSystems):
-            #Give progress to user if rebuilding has hundreds of ROMS
-            rebuildingmsgBox = DownloadProgressDialog()
-            rebuildingmsgBox.progress.reset()
-            rebuildingmsgBox.setText("Rebuilding roms...")
-            progress = 20
-            rebuildingmsgBox.showProgress(progress, True)
-            rebuildingmsgBox.show()
-            for console in frogtool.systems.keys():
-                result = frogtool.process_sys(drive, console, False)
-                #Update Progress
-                progress += 10
-                rebuildingmsgBox.showProgress(progress, True)
-            #TODO: eventually we could return a total roms across all systems, but not sure users will care
-            rebuildingmsgBox.close()
-            QMessageBox.about(window, "Result", "Rebuilt all ROMS for all systems")
-        else:
-            result = frogtool.process_sys(drive, console, False)
-            print("Result " + result)      
-        #Always reload the table now that the folders are all cleaned up
-        window.loadROMsToTable()
-    except frogtool.StopExecution:
-        pass
+
+    print(f"Running frogtool with drive ({drive}) and consoles ({frog_item[0]})")
+    logging.info(f"Running frogtool with drive ({drive}) and console ({frog_item[0]})")
+    result = frogtool.process_sys(drive, frog_item, False)
+    print("Result " + result)      
+    #Always reload the table now that the folders are all cleaned up
+    window.loadROMsToTable()
+
 
 # SubClass QMainWindow to create a Tadpole general interface
 class MainWindow (QMainWindow):
@@ -500,7 +511,7 @@ class MainWindow (QMainWindow):
     def Settings(self):
         SettingsDialog(tpConf).exec()
         if(self.combobox_drive.currentText() != static_NoDrives):
-            RunFrogTool(self.combobox_drive.currentText(), self.combobox_console.currentText())
+            RunFrogTool(self.combobox_drive.currentText(), self.combobox_console.currentData())
 
     def detectOSVersion(self):
         logging.info("Tadpole~DetectOSVersion")
@@ -705,18 +716,22 @@ from tzlion on frogtool. Special thanks also goes to wikkiewikkie & Jason Grieve
         
     def combobox_drive_change(self):
         newDrive = self.combobox_drive.currentText()
-        console = self.combobox_console.currentText()
         logging.info(f"Combobox for drive changed to ({newDrive})")
         if (newDrive != static_NoDrives):
-            RunFrogTool(newDrive,console)
+            frog_config.read_frog_config(newDrive)
+            self.combobox_console.clear()
+            for frog_item in frog_config.systems:
+                self.combobox_console.addItem(QIcon(), frog_item[0], frog_item)
+            
+            RunFrogTool(newDrive, self.combobox_console.currentData())
 
     def combobox_console_change(self):
-        console = self.combobox_console.currentText()
-        logging.info(f"Combobox for console changed to ({console})")
+        frog_item = self.combobox_console.currentData()
+        logging.info(f"Combobox for console changed to ({frog_item[0]})")
         # ERIC: We shouldnt run frogtool as soon as the drive is opened. This is a lot of unnecessary processing.  
         # Jason: agree it takes processing, but there were some crashing bugs where we got out of sync with the table
         # Jason: and if the user changes anything outside of Tadpole it helps keep in sync.  Pros and cons
-        RunFrogTool(self.combobox_drive.currentText(),console)
+        RunFrogTool(self.combobox_drive.currentText(), frog_item)
 
     def show_readme(self):
         self.readme_dialog = ReadmeDialog(basedir)
@@ -727,8 +742,7 @@ from tzlion on frogtool. Special thanks also goes to wikkiewikkie & Jason Grieve
         logging.info("Tadpole~change_OS: Updating OS from ({url})")
         self.UpdateDeviceFromZip(url)
         #Rebuild the ROM lists just incase we did a full rebuild
-        RunFrogTool(self.combobox_drive.currentText(),static_AllSystems)
-
+        self.rebuildAll()
 
     def makeMulticoreROMList(self):
         logging.info("Tadpole~makeMulticoreROMList")
@@ -1112,8 +1126,7 @@ This process is only tested on Windows and will not work on Linux/Mac.\n\nDo you
         return status
     
     def rebuildAll(self):
-        RunFrogTool(self.combobox_drive.currentText(),static_AllSystems)
-        return
+        full_rebuild_rom_list(self.combobox_drive.currentText(), frog_config.systems)
 
     def createSaveBackup(self):
         drive = self.combobox_drive.currentText()
@@ -1242,7 +1255,7 @@ Note: You can change in settings to either pick your own or try to downlad autom
             QMessageBox.about(self, "Success",f"Successfully deleted all selected ROMs.")
         else:
             QMessageBox.about(self, "Error","An error occurred while trying to delete the ROMs. PLease check the log file.")
-        RunFrogTool(drive,console)
+        RunFrogTool(self.combobox_drive.currentText(), self.combobox_console.currentData())
 
     def copyUserSelectedDirectoryButton(self):
         source_directory = self.combobox_drive.currentText()
@@ -1277,7 +1290,7 @@ Note: You can change in settings to either pick your own or try to downlad autom
         logging.info(f"loading roms to table for ({drive}) ({system})")
         msgBox = DownloadProgressDialog()
         msgBox.setText(" Loading "+ system + " ROMS...")
-        if drive == static_NoDrives or system == "???" or system == static_AllSystems:
+        if drive == static_NoDrives or system == "???":
             #TODO: should load ALL ROMs to the table rather than none
             self.tbl_gamelist.setRowCount(0)
             return
@@ -1383,7 +1396,7 @@ Note: You can change in settings to either pick your own or try to downlad autom
         self.tbl_gamelist.show()
 
     def RebuildClicked(self):
-        RunFrogTool(self.combobox_drive.currentText(),self.combobox_console.currentText())
+        RunFrogTool(self.combobox_drive.currentText(),self.combobox_console.currentData())
         return
             
 if __name__ == "__main__":
@@ -1404,11 +1417,6 @@ if __name__ == "__main__":
         # Build the Window
         window = MainWindow()
         window.show()
-
-        # Clear and update the list of consoles. This has to happen before the drive loading in case a valid SD card is already connected
-        window.combobox_console.clear()
-        for console in tadpole_functions.systems.keys():
-            window.combobox_console.addItem(QIcon(), console, console)
 
         # Update list of drives
         window.combobox_drive.addItem(QIcon(), static_NoDrives, static_NoDrives)

@@ -1,11 +1,17 @@
 import os
+
+from PyQt5.QtGui import QImage
+
 from utils.image_utils import (
+    create_zxx_file,
     get_bytes_from_qimage,
     load_as_qimage,
-    create_zxx_file,
     replace_thumb_in_zxx,
 )
-from PyQt5.QtGui import QImage
+
+# Resources
+# GB300 : https://nummacway.github.io/gb300/
+# SF2000 : https://github.com/vonmillhausen/sf2000?tab=readme-ov-file
 
 # MENU RESSOURCES INDEXES
 ENGLISH_ROMLIST = 0  # English ROM Names, used to display the game-lists when the UI language is set to English
@@ -15,6 +21,7 @@ MAIN_MENU_BKG = 3  # Main menu background (640x480 RGB565 Little Endian for SF20
 GAMELIST_BKG = 4  # Game-list background (640x480 RGB565 Little Endian for SF2000)
 GAMELIST_INDICATOR = 5  # Game-list indicator (40x24 RGB565 Little Endian for SF2000)
 
+# File extension doesn't seem to matter much. This mapping table may be useless
 zxx_exts = {
     "zfc": ["nes", "fds", "unf", "nfc"],
     "zgb": [
@@ -27,6 +34,7 @@ zxx_exts = {
     ],
     "zmd": ["md", "smd", "gen", "sms"],
     "zsf": ["sfc", "smc", "fig", "swc", "gd3", "gd7", "dx2", "bsx", "bin"],
+    "zpc": ["pce"],
 }
 
 
@@ -50,16 +58,36 @@ frog_systems = {
         ]
     },
     "GB300":{
-        "screen_size": (960, 853),
-        "bootscreen_size": (853, 392),
-        "image_format": QImage.Format_RGB16
+        "screen_size": (640, 480),
+        "bootscreen_size": (512, 200),
+        "image_format": QImage.Format_RGB16,
+        "max_menu_items": 10,
+        "menu_ressources":  [
+            ["rdbui.tax", "fhcfg.nec", "nethn.bvs"],  # Menu entry #0 : FC
+            ["urefs.tax", "adsnt.nec", "xvb6c.bvs"],  # Menu entry #1 : #SFC
+            ["scksp.tax", "setxa.nec", "wmiui.bvs"],  # Menu entry #2 : #MD
+            ["vdsdc.tax", "umboa.nec", "qdvd6.bvs"],  # Menu entry #3 : #GB
+            ["pnpui.tax", "wjere.nec", "mgdel.bvs"],  # Menu entry #4 : #GBC
+            ["vfnet.tax", "htuiw.nec", "sppnp.bvs"],  # Menu entry #5 : #GBA
+            ["mswb7.tax", "msdtc.nec", "mfpmp.bvs"],  # Menu entry #6 : #ARCADE
+        ]
     },
-    "SF900":{
+    "SF900":{ # Sure
         "screen_size": (960, 853),
         "bootscreen_size": (853, 392),
         "image_format": QImage.Format_RGB16
     },
     "Vilcorn":{ # == SF900 ?
+        "screen_size": (960, 853),
+        "bootscreen_size": (853, 392),
+        "image_format": QImage.Format_RGB16
+    },
+    "SF901":{
+        "screen_size": (960, 853),
+        "bootscreen_size": (853, 392),
+        "image_format": QImage.Format_RGB16
+    },
+    "SG800":{ #Y2 SG 2.0
         "screen_size": (960, 853),
         "bootscreen_size": (853, 392),
         "image_format": QImage.Format_RGB16
@@ -85,7 +113,6 @@ class FrogConfig:
     def read_frog_config(self, frog_root_path):
         """
         Read config from Foldername.ini
-        Source : https://github.com/vonmillhausen/sf2000?tab=readme-ov-file#foldernameini
         """
 
         foldername_ini = os.path.join(frog_root_path, "Resources", "Foldername.ini")

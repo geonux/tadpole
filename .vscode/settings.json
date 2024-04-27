@@ -1,0 +1,18 @@
+{
+    "[python]": {
+        "editor.defaultFormatter": "ms-python.black-formatter",
+        "editor.formatOnSave": false,
+        "editor.codeActionsOnSave": {
+            "source.organizeImports": true
+        },
+    },
+    "isort.args": [
+        "--profile",
+        "black"
+    ],
+    "python.languageServer": "Pylance",
+    "codeium.enableConfig": {
+
+        "*": true
+    },
+}
