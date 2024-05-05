@@ -1,7 +1,8 @@
-import os
 import logging
+import os
 
 from sf2000ROM import sf2000ROM
+
 static_TadpoleDir = os.path.join(os.path.expanduser('~'), '.tadpole')
 static_LoggingPath = os.path.join(static_TadpoleDir, 'tadpole.log')
 static_TadpoleConfigFile = os.path.join(static_TadpoleDir, 'tadpole.ini')
@@ -16,40 +17,46 @@ if __name__ == "__main__":
                         level=logging.DEBUG)
         logging.info("Tadpole Started")
         
-# GUI imports
-from PyQt5.QtWidgets import *
-from PyQt5.QtGui import *
-from PyQt5.QtCore import Qt, QTimer, QSize
+import configparser
+import hashlib
+import json
+import shutil
+import subprocess
+
 # OS imports - these should probably be moved somewhere else
 import sys
-import shutil
-import hashlib
 import time
+import webbrowser
+from datetime import datetime
+from pathlib import Path
 
-# Tadpole imports
-import frogtool
-import tadpole_functions
-from tadpoleConfig import TadpoleConfig
-import multicore_functions
-# Dialog imports
-from dialogs.SettingsDialog import SettingsDialog
-from dialogs.ThumbnailDialog import ThumbnailDialog
-from dialogs.BootConfirmDialog import BootConfirmDialog
-from dialogs.DownloadProgressDialog import DownloadProgressDialog
-from dialogs.GameShortcutIconsDialog import GameShortcutIconsDialog
-from dialogs.MusicConfirmDialog import MusicConfirmDialog
-from dialogs.ReadmeDialog import ReadmeDialog
+import psutil
 
 #feature imports
 import requests
-import psutil
-import json
 from bs4 import BeautifulSoup
-from datetime import datetime
-from pathlib import Path
-import configparser
-import webbrowser
-import subprocess
+from PyQt5.QtCore import QSize, Qt, QTimer
+from PyQt5.QtGui import *
+
+# GUI imports
+from PyQt5.QtWidgets import *
+
+# Tadpole imports
+import frogtool
+import multicore_functions
+import tadpole_functions
+from dialogs.DownloadProgressDialog import DownloadProgressDialog
+from dialogs.GameShortcutIconsDialog import GameShortcutIconsDialog
+from dialogs.imageChangeDialog import ImageChangeDialog
+from dialogs.MusicConfirmDialog import MusicConfirmDialog
+from dialogs.ProgressDialog import ProgressDialog
+from dialogs.ReadmeDialog import ReadmeDialog
+
+# Dialog imports
+from dialogs.SettingsDialog import SettingsDialog
+from frog_config import MAIN_MENU_BKG, frog_config
+from tadpoleConfig import TadpoleConfig
+from utils.image_utils import create_zfb_file, image_exts
 
 basedir = os.path.dirname(__file__)
 static_NoDrives = "N/A"
@@ -62,25 +69,17 @@ tpConf = TadpoleConfig()
 
 def full_rebuild_rom_list(frog_root_path: str, systems: list[any]):
     """Give progress to user if rebuilding has hundreds of ROMS
-    """    
-    rebuildingmsgBox = DownloadProgressDialog()
-    rebuildingmsgBox.progress.reset()
-    rebuildingmsgBox.setText("Rebuilding roms...")
-    rebuildingmsgBox.showProgress(progress, True)
-    rebuildingmsgBox.show()
-
-    progress = 0
-    inc = 100 / len(systems)
-    
-    rebuildingmsgBox.showProgress(progress, True)
-    for system in systems:
-        result = frogtool.process_sys(frog_root_path, system, False)
-        #Update Progress
-        progress += inc
-        rebuildingmsgBox.showProgress(progress, True)
+    """
+    progress = ProgressDialog("Rebuilding roms...", len(systems), window)
+    progress.show()
+    for i, system in enumerate(systems):
+        frogtool.process_sys(frog_root_path, system, False)
+        progress.setValue(i+1)
+        if progress.wasCanceled():
+            break
 
     #TODO: eventually we could return a total roms across all systems, but not sure users will care
-    rebuildingmsgBox.close()
+    progress.close()
 
     # reload the table now that the folders are all cleaned up
     window.loadROMsToTable()
@@ -545,36 +544,47 @@ class MainWindow (QMainWindow):
     
     def addBoxart(self):
         drive = self.combobox_drive.currentText()
-        system = self.combobox_console.currentText()
-        rom_path = os.path.join(drive,system)
-        romList = frogtool.getROMList(rom_path)
-        msgBox = DownloadProgressDialog()
+        system = self.combobox_console.currentData()
+        roms_path = frog_config.system_path(system)
+        romList = frogtool.getROMList(roms_path)
+        
         failedConversions = 0
+        
         #Check what the user has configured; local or download
         ovewrite = tpConf.getThumbnailOverwrite()
         if not tpConf.getThumbnailDownload():
             # User has chosen to use local thumbnails
-            directory = QFileDialog.getExistingDirectory()
-            if directory == '':
-                    return
-            files = os.listdir(directory)
+            thumbs_dir = QFileDialog.getExistingDirectory()
+            if thumbs_dir == '':
+                return
+            
             #Setup progress as these can take a while
-            msgBox.progress.setMaximum(len(romList))
-            msgBox.setText("Copying thumbnails for zips")
-            msgBox.showProgress(0, True)
-            msgBox.show()
-            for i, newThumbnail in enumerate(files):
-                newThumbnailName = os.path.splitext(newThumbnail)[0]
-                newThumbnailPath = os.path.join(directory, newThumbnail)
-                #Only copy images over from that folder
-                if newThumbnail.lower().endswith(('.png', '.jpg', '.jpeg', '.gif')):
-                    for rom in romList:
-                        romName = os.path.splitext(rom)[0]
-                        if newThumbnailName == romName:
-                            rom_full_path = os.path.join(rom_path, rom)
-                            if not tadpole_functions.addThumbnail(rom_full_path, drive, system, newThumbnailPath, ovewrite):
-                                failedConversions += 1
-                msgBox.showProgress(i, True)
+            progress = ProgressDialog("Processing thumbnails...", len(romList) + 20, self)
+            progress.show()
+
+            # Prepare thumbnails lookup-table
+            progress.setLabelText("Prepare thumbnails lookup-table")
+            thumbs_map = {}
+            for thumb in os.listdir(thumbs_dir):
+                thumb_name, thumb_ext = os.path.splitext(thumb.lower())
+                if thumb_ext not in image_exts:
+                    continue
+                thumbs_map[thumb_name] = thumb
+
+            # Analyse Roms
+            progress.setLabelText("Adding thumbnails for ROMS")
+            for i, rom in enumerate(romList):
+                progress.setValue(20 + i)
+                if progress.wasCanceled():
+                    break
+
+                rom_name = os.path.splitext(rom)[0]
+                match_thumb = thumbs_map.get(rom_name.lower())
+                if not match_thumb:
+                    continue
+
+                new_thumb = QImage(os.path.join(thumbs_dir, match_thumb))
+                frog_config.change_thumbnail(roms_path / rom, new_thumb, ovewrite)
         
         else:
         #User wants to download romart from internet
@@ -798,17 +808,12 @@ from tzlion on frogtool. Special thanks also goes to wikkiewikkie & Jason Grieve
         UpdateMsgBox.close()
 
     def edit_thumbnail(self, rom_path):
-        try:
-            thumb_qimage = get_qimage_from_zxx(rom_path, frog_config.thumb_size, frog_config.image_format)
-        except ValueError as e:
-            logging.error(e)
-            thumb_qimage = None
-
+        thumb_qimage = frog_config.load_thumbnail(rom_path)
         dialog = ImageChangeDialog(f"Thumbnail - {rom_path}", thumb_qimage, frog_config.thumb_size, frog_config.image_format)
         status = dialog.exec()
         if status:
             new_thumb = dialog.get_new_image()
-            frog_config.create_or_edit_zxx_file(self.combobox_console.currentData(), rom_path, new_thumb, True)
+            frog_config.change_thumbnail(rom_path, new_thumb, True)
          
             # TODO Change way to launch frogtool
             RunFrogTool(self.combobox_drive.currentText(), self.combobox_console.currentData())
@@ -1245,7 +1250,7 @@ Note: You can change in settings to either pick your own or try to downlad autom
         for item in self.tbl_gamelist.selectedItems():
             try:
                 objGame = self.ROMList[item.row()]
-                result = tadpole_functions.deleteROM(objGame.ROMlocation)
+                result = tadpole_functions.deleteROM(objGame.rom_path)
             except Exception:
                 result = False
         if result: 
@@ -1290,7 +1295,7 @@ Note: You can change in settings to either pick your own or try to downlad autom
             #TODO: should load ALL ROMs to the table rather than none
             self.tbl_gamelist.setRowCount(0)
             return
-        roms_path = os.path.join(drive, system)
+        roms_path = Path(drive) / system
         try:
             files = frogtool.getROMList(roms_path)
             self.ROMList = []
@@ -1306,9 +1311,7 @@ Note: You can change in settings to either pick your own or try to downlad autom
             #sort the list aphabetically before we go through it
             files = sorted(files)
             for i,game in enumerate(files):
-                objGame = sf2000ROM(os.path.join(roms_path, game))
-                if objGame.ROMlocation == '':
-                    continue
+                objGame = sf2000ROM(roms_path / game)
                 self.ROMList.append(objGame)
                 humanReadableFileSize = tadpole_functions.getHumanReadableFileSize(objGame.getFileSize())
                 # Filename
@@ -1329,21 +1332,12 @@ Note: You can change in settings to either pick your own or try to downlad autom
                     self.tbl_gamelist.setIconSize(QSize(144, 208))
                     cell_viewthumbnail = QTableWidgetItem()
                     cell_viewthumbnail.setTextAlignment(Qt.AlignCenter)
-                    #pathToROM = os.path.join(roms_path, game)
-                    pathToROM = objGame.ROMlocation
-                    extension = Path(pathToROM).suffix
+                    extension =  objGame.rom_path.suffix
                     #only show thumbnails of the .z** files 
-                    sys_zxx_ext = '.' + frogtool.zxx_ext[system]
-                    if(extension == sys_zxx_ext):
-                        with open(pathToROM, "rb") as rom_file:
-                            rom_content = bytearray(rom_file.read(((144*208)*2)))
-                        
-                        img = QImage(rom_content[0:((144*208)*2)], 144, 208, QImage.Format_RGB16) # The byte array length has been left here as a second safety to ensure we dont try to over read.            
+                    if (extension in frog_config.zxx_exts()):
+                        img = frog_config.load_thumbnail( objGame.rom_path)
                         pimg = QPixmap()
-                        icon = QIcon()
-                        QPixmap.convertFromImage(pimg, img)
-                        #QIcon.addPixmap(icon, pimg)
-                        #cell_viewthumbnail.setIcon(icon)
+                        pimg.convertFromImage(img)
                         cell_viewthumbnail.setData(Qt.DecorationRole, pimg)
                         cell_viewthumbnail.setFlags(Qt.ItemIsSelectable|Qt.ItemIsEnabled)
                         self.tbl_gamelist.setItem(i, 2, cell_viewthumbnail)

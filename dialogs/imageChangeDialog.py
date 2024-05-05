@@ -3,20 +3,19 @@ from PyQt5.QtCore import Qt
 from PyQt5.QtGui import QIcon, QImage, QPixmap
 from PyQt5.QtWidgets import *
 
-from utils.image_utils import get_bytes_from_qimage, image_exts, load_as_qimage
+from utils.image_utils import Size, get_bytes_from_qimage, image_exts, load_as_qimage
 
 
 class ImageChangeDialog(QDialog):
 
-    def __init__(
-        self, title: str, image_fp: any, image_size: tuple[int, int], image_format: int
-    ):
+    def __init__(self, title: str, image_fp: any, image_size: Size, image_format: int):
         """Dialog used to change Frog images
 
         Args:
             title (str): Dialog title
             image_fp (any): Current image
-            image_size (tuple[int,int]): Image size (width, height)
+            image_size (Size): Image size (Tuple width, height)
+            image_format (int): Image format
         """
         super().__init__()
 
@@ -92,7 +91,7 @@ class ImageChangeDialog(QDialog):
 
     def _save_current_as(self):
         newCoverFileName = QFileDialog.getSaveFileName(
-            self, "Save Cover", "c:\\", "Image files (*.png)"
+            self, "Save Cover", "", "Image files (*.png)"
         )[0]
 
         if newCoverFileName:

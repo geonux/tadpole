@@ -42,7 +42,7 @@ class TadpoleConfig:
             self.config.write(fp)
 
     def setVariable(self, section, option, value):
-        self.config[section][option] = value
+        self.config[section][option] = str(value)
         with open(self._tadpole_config_file, "w") as fp:
             self.config.write(fp)
 

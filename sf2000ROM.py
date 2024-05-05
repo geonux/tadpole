@@ -1,37 +1,35 @@
-import os
+from pathlib import Path
 
-class sf2000ROM():
-    ROMlocation = ""
-    ROMsecondaryFiles = []
-    title = ""
+
+class sf2000ROM:
+    rom_path: Path
+    title: str
     thumbnail = None
     console = None
 
-    def __init__(self, location):
+    def __init__(self, path: Path):
         super().__init__()
-        # Check the file actually exists otherwise throw an error
-        if not os.path.isfile(location):
-            raise Exception
-        self.ROMlocation = location
-        self.title = os.path.splitext(os.path.basename(location))[0]
+        self.rom_path = path
+        self.title = path.stem
 
-
-    """
-    Note that this will change the filename as well
-    """
     def setTitle(self, newTitle):
-        try:
-            ext = os.path.splitext(self.ROMlocation)[1]
-            newPath = os.path.join(os.path.dirname(self.ROMlocation),newTitle+ext)
-            os.rename(self.ROMlocation, newPath)
-            self.ROMlocation = newPath         
-            self.title = newTitle
-            return True
-        except:
-            return False
+        """
+        Change the title of the ROM and rename the file accordingly
+        """
 
+        new_path = self.rom_path.with_stem(newTitle)
+        self.rom_path.rename(new_path)
+        self.rom_path = new_path
+        self.title = new_path.stem
+#
     def getFileSize(self):
-        if not os.path.isfile(self.ROMlocation):
-            raise Exception
-        return os.path.getsize(self.ROMlocation)
+        return self.rom_path.stat().st_size
         # TODO Add counting multiple files for ARCADE zips
+
+    def getHumanFileSize(self):
+        filesize = self.getFileSize()
+        for unit in ("", "K", "M"):
+            if filesize < 1024.0:
+                return f"{filesize:3.2f} {unit}B"
+            filesize /= 1024.0
+        return f"{filesize:.2f} GB"
