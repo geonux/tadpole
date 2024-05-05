@@ -56,7 +56,16 @@ from dialogs.ReadmeDialog import ReadmeDialog
 from dialogs.SettingsDialog import SettingsDialog
 from frog_config import MAIN_MENU_BKG, frog_config
 from tadpoleConfig import TadpoleConfig
-from utils.image_utils import create_zfb_file, image_exts
+from utils.bios_utils import (
+    BatteryPatcher,
+    bisrv_getFirmwareVersion,
+    changeBootLogo,
+    findSequence,
+    offset_logo_presequence,
+    version_displayString_1_6,
+    version_displayString_1_71,
+)
+from utils.image_utils import image_exts
 
 basedir = os.path.dirname(__file__)
 static_NoDrives = "N/A"
@@ -522,7 +531,7 @@ class MainWindow (QMainWindow):
         msg_box.show()
         try:
             msg_box.showProgress(50, True)
-            detectedVersion = tadpole_functions.bisrv_getFirmwareVersion(os.path.join(drive,"bios","bisrv.asd"))
+            detectedVersion = bisrv_getFirmwareVersion(os.path.join(drive,"bios","bisrv.asd"))
             if not detectedVersion:
                 detectedVersion = "Version Not Found"
                 return False
@@ -696,7 +705,7 @@ from tzlion on frogtool. Special thanks also goes to wikkiewikkie & Jason Grieve
     def changeBootLogo(self):
         with open(frog_config.get_bios_file(), "rb") as bios_file:
             bios_content = bytearray(bios_file.read())
-            offset = tadpole_functions.findSequence(tadpole_functions.offset_logo_presequence, bios_content) + 16
+            offset = findSequence(offset_logo_presequence, bios_content) + 16
 
         dialog = ImageChangeDialog("Boot Image Selection", offset, frog_config.bootscreen_size, frog_config.image_format)
         change = dialog.exec()
@@ -711,7 +720,7 @@ from tzlion on frogtool. Special thanks also goes to wikkiewikkie & Jason Grieve
                 msgBox.setText("Updating boot logo...")
                 msgBox.show()
                 msgBox.showProgress(10, True)
-                success = tadpole_functions.changeBootLogo(frog_config.get_bios_file(),
+                success = changeBootLogo(frog_config.get_bios_file(),
                                                  newLogoFileName, msgBox)
                 msgBox.close()
             except tadpole_functions.Exception_InvalidPath:
@@ -723,8 +732,6 @@ from tzlion on frogtool. Special thanks also goes to wikkiewikkie & Jason Grieve
             else:
                 QMessageBox.about(self, "Change Boot Logo", "Could not update boot logo.  Have you changed the firmware with another tool?  Tadpole only supports stock firmware files")
 
-    def UnderDevelopmentPopup(self):
-        QMessageBox.about(self, "Development", "This feature is still under development")
         
     def combobox_drive_change(self):
         newDrive = self.combobox_drive.currentText()
@@ -786,13 +793,13 @@ from tzlion on frogtool. Special thanks also goes to wikkiewikkie & Jason Grieve
         ret = qm.question(self,'Patch Firmware?', "Are you sure you want to patch the firmware? The system will also check if supported firmware is on the SD card, so make sure you are up to date." , qm.Yes | qm.No)
         if ret == qm.No:
             return
-        fw_version = tadpole_functions.bisrv_getFirmwareVersion(os.path.join(self.combobox_drive.currentText(),"bios","bisrv.asd"))
-        battery_patcher = tadpole_functions.BatteryPatcher(os.path.join(self.combobox_drive.currentText(),"bios","bisrv.asd"), fw_version)
+        fw_version = bisrv_getFirmwareVersion(os.path.join(self.combobox_drive.currentText(),"bios","bisrv.asd"))
+        battery_patcher = BatteryPatcher(os.path.join(self.combobox_drive.currentText(),"bios","bisrv.asd"), fw_version)
         if battery_patcher.check_patch_applied():
             QMessageBox.about(self, "Status","You already have the battery patch applied")
             return
         #Patch isnt already applied so lets check that we are on a supported firmware version for the battery patch
-        elif fw_version != tadpole_functions.version_displayString_1_6 and fw_version != tadpole_functions.version_displayString_1_71:
+        elif fw_version != version_displayString_1_6 and fw_version != version_displayString_1_71:
             qm = QMessageBox()
             ret = qm.question(self,'Status', "This version of tadpole only supports battery patching of v1.6 and v1.71 firmware.  Do you want to downlaod v1.71 now?" , qm.Yes | qm.No)
             if ret == qm.No:
@@ -1122,7 +1129,7 @@ This process is only tested on Windows and will not work on Linux/Mac.\n\nDo you
         msgBox.showProgress(1, True)
         if not tadpole_functions.downloadFileFromGithub(bootlogo_file, url):
             status = False
-        if tadpole_functions.changeBootLogo(index_path, bootlogo_file, msgBox):
+        if  changeBootLogo(index_path, bootlogo_file, msgBox):
             QMessageBox.about(self, "Success", "The boot logo was updated to " + self.sender().text())
             status = True
         else:

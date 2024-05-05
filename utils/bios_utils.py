@@ -1,24 +1,24 @@
-# GUI imports
 import hashlib
-import json
 import logging
-
-# OS imports
 import os
-import shutil
 
-# feature imports
-import struct
-import zipfile
-from io import BytesIO
-
-import requests
 from PyQt5.QtCore import *
 from PyQt5.QtGui import *
 from PyQt5.QtWidgets import *
 
-import frogtool
-from utils.image_utils import create_zxx_file, get_bytes_from_qimage, load_as_qimage
+from utils.image_utils import get_bytes_from_qimage
+
+version_displayString_1_5 = "2023.04.20 (V1.5)"
+version_displayString_1_6 = "2023.08.03 (V1.6)"
+version_displayString_1_7 = "2023.10.07 (V1.7)"
+version_displayString_1_71 = "2023.10.13 (V1.71)"
+# hash, versionName
+versionDictionary = {
+    "151d5eeac148cbede3acba28823c65a34369d31b61c54bdd8ad049767d1c3697": version_displayString_1_5,
+    "5335860d13214484eeb1260db8fe322efc87983b425ac5a5f8b0fcdf9588f40a": version_displayString_1_6,
+    "b88458bf2c25d3a34ab57ee149f36cfdc6b8a5138d5c6ed147fbea008b4659db": version_displayString_1_7,
+    "08bd07ab3313e3f00b922538516a61b5846cde34c74ebc0020cd1a0b557dd54b": version_displayString_1_71,
+}
 
 offset_logo_presequence = [
     0x62,
