@@ -1,15 +1,18 @@
 # GUI imports
-from PyQt5.QtWidgets import *
-from PyQt5.QtGui import *
-from PyQt5.QtMultimedia import QSoundEffect
-from PyQt5.QtCore import Qt
+import logging
+
 # OS imports - these should probably be moved somewhere else
 import os
+
 # feature imports
 from PIL import Image, ImageDraw
-import tadpole_functions
+from PyQt5.QtCore import Qt
+from PyQt5.QtGui import *
+from PyQt5.QtWidgets import *
+
 import frogtool
-import logging
+import tadpole_functions
+
 
 class GameShortcutIconsDialog(QDialog):
     """

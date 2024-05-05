@@ -164,7 +164,7 @@ class MainWindow (QMainWindow):
         # Add ROMS button
         self.btn_update = QPushButton("Add ROMs...")
         selector_layout.addWidget(self.btn_update)
-        self.btn_update.clicked.connect(self.copyRoms)
+        self.btn_update.clicked.connect(self.action_add_roms)
         
         # Add Thumbnails button
         self.btn_update_thumbnails = QPushButton("Add Thumbnails...")
@@ -412,14 +412,17 @@ class MainWindow (QMainWindow):
         if self.columns[changedColumn] == self._static_columns_GameName:
             # Update the game name
             self.ROMList[changedRow].setTitle(self.sender().itemAt(changedColumn,changedRow).text())
+            console = self.combobox_console.currentData()
+            drive = self.combobox_drive.currentText()
+            RunFrogTool(drive, console)
 
     def catchTableCellClicked(self, clickedRow, clickedColumn):
         print(f"clicked Cell for ({clickedRow},{clickedColumn})")
         objGame = self.ROMList[clickedRow]
         if self.tbl_gamelist.horizontalHeaderItem(clickedColumn).text() == self._static_columns_Thumbnail:  
-            self.edit_thumbnail(objGame.ROMlocation)
+            self.edit_thumbnail(objGame.rom_path)
         elif self.tbl_gamelist.horizontalHeaderItem(clickedColumn).text() == self._static_columns_Delete: 
-            self.deleteROM(objGame.ROMlocation)
+            self.delete_rom(objGame.rom_path)
         #Only enable deleting when selcted
         if clickedColumn == 0:
             selected = self.tbl_gamelist.selectedItems()
@@ -454,8 +457,7 @@ class MainWindow (QMainWindow):
                 position = int(comboBox.currentText())
                 #position is 0 based
                 position = position - 1
-                filename = os.path.basename(self.ROMList[i].ROMlocation)
-                tadpole_functions.changeGameShortcut(drive, console, position, filename)
+                tadpole_functions.changeGameShortcut(drive, self.ROMList[i].rom_path, console, position)
 
     """
     Reloads the drive list to check whether there have been any changes
@@ -592,10 +594,14 @@ class MainWindow (QMainWindow):
             if system == "ARCADE":
                 QMessageBox.about(self, "Add Thumbnails", "Custom Arcade ROMs cannot have thumbnails at this time.")
                 return
+            
             QMessageBox.about(self, "Add Thumbnails", "You have Tadpole configured to download thumbnails automatically. \
 For this to work, your roms must be in ZIP files and the name of that zip must match their common released English US localized \
 name.  Please refer to https://github.com/EricGoldsteinNz/libretro-thumbnails/tree/master if Tadpole isn't finding \
-the thumbnail for you. ") 
+the thumbnail for you. ")
+            
+
+            
             #Need the url for scraping the png's, which is different
             ROMART_baseURL_parsing = "https://github.com/EricGoldsteinNz/libretro-thumbnails/tree/master/"
             ROMART_baseURL = "https://raw.githubusercontent.com/EricGoldsteinNz/libretro-thumbnails/master/"
@@ -644,7 +650,7 @@ the thumbnail for you. ")
                                 if not tadpole_functions.addThumbnail(rom_full_path, drive, system, newThumbnailPath, ovewrite): 
                                     failedConversions += 1
                 msgBox.showProgress(i, True)
-        msgBox.close()
+        progress.close()
         if failedConversions == 0:
             QMessageBox.about(self, "Add thubmnails", "ROM thumbnails successfully changed")
             RunFrogTool(drive, system)
@@ -688,12 +694,11 @@ from tzlion on frogtool. Special thanks also goes to wikkiewikkie & Jason Grieve
         QMessageBox.about(self, "GBA BIOS Fix", "BIOS successfully copied")
         
     def changeBootLogo(self):
-        msgBox = DownloadProgressDialog()
-        msgBox.setText(" Loading current boot logo...")
-        msgBox.show()
-        msgBox.showProgress(50, True)
-        dialog = BootConfirmDialog(self.combobox_drive.currentText(), basedir)
-        msgBox.close()
+        with open(frog_config.get_bios_file(), "rb") as bios_file:
+            bios_content = bytearray(bios_file.read())
+            offset = tadpole_functions.findSequence(tadpole_functions.offset_logo_presequence, bios_content) + 16
+
+        dialog = ImageChangeDialog("Boot Image Selection", offset, frog_config.bootscreen_size, frog_config.image_format)
         change = dialog.exec()
         if change:
             newLogoFileName = dialog.new_viewer.path
@@ -706,9 +711,7 @@ from tzlion on frogtool. Special thanks also goes to wikkiewikkie & Jason Grieve
                 msgBox.setText("Updating boot logo...")
                 msgBox.show()
                 msgBox.showProgress(10, True)
-                success = tadpole_functions.changeBootLogo(os.path.join(self.combobox_drive.currentText(),
-                                                              "bios",
-                                                              "bisrv.asd"),
+                success = tadpole_functions.changeBootLogo(frog_config.get_bios_file(),
                                                  newLogoFileName, msgBox)
                 msgBox.close()
             except tadpole_functions.Exception_InvalidPath:
@@ -727,7 +730,7 @@ from tzlion on frogtool. Special thanks also goes to wikkiewikkie & Jason Grieve
         newDrive = self.combobox_drive.currentText()
         logging.info(f"Combobox for drive changed to ({newDrive})")
         if (newDrive != static_NoDrives):
-            frog_config.read_frog_config(newDrive)
+            frog_config.read_frog_config(Path(newDrive))
             self.combobox_console.clear()
             for frog_item in frog_config.systems:
                 self.combobox_console.addItem(QIcon(), frog_item[0], frog_item)
@@ -878,17 +881,18 @@ from tzlion on frogtool. Special thanks also goes to wikkiewikkie & Jason Grieve
         self.bootloaderPatch()
         return True
 
-    def deleteROM(self, rom_path):
-        console = self.combobox_console.currentText()
-        drive = self.combobox_drive.currentData()
+    def delete_rom(self, rom_path: Path):
         qm = QMessageBox
-        ret = qm.question(self,'Delete ROM?', "Are you sure you want to delete " + rom_path +" and rebuild the ROM list? " , qm.Yes | qm.No)
+        ret = qm.question(self,'Delete ROM?', f"Are you sure you want to delete {rom_path.stem} and rebuild the ROM list? " , qm.Yes | qm.No)
         if ret == qm.Yes:
             try:
-                tadpole_functions.deleteROM(rom_path)
+                frog_config.delete_rom(rom_path)
             except Exception:
                 QMessageBox.about(self, "Error","Could not delete file.")
-            RunFrogTool(drive,console)
+            
+            console = self.combobox_console.currentData()
+            drive = self.combobox_drive.currentText()
+            RunFrogTool(drive, console)
         return
 
     def addToShortcuts(self, rom_path):
@@ -1156,51 +1160,35 @@ It is recommended to save it somewhere other than your SD card used with the SF2
             msgBox.close()
             QMessageBox.about(self, "Failure","ERROR: Something went wrong while trying to create the save backup")    
         
-    def copyRoms(self):
-        drive = window.combobox_drive.currentText()
-        console = window.combobox_console.currentText()
-        #ARCADE is special, only ZIP's are supported
-        if(console == 'ARCADE'):          
-            filenames, _ = QFileDialog.getOpenFileNames(self,"Select ROMs",'',"ROM files (*.zip)")
-        else:
-            filenames, _ = QFileDialog.getOpenFileNames(self,"Select ROMs",'',"ROM files (*.zip \
-                                                    *.zfc *.zsf *.zmd *.zgb *.zfb *.smc *.fig *.sfc *.gd3 *.gd7 *.dx2 *.bsx *.swc \
-                                                    *.nes *.nfc *.fds *.unf *.gbc *.gb *.sgb *.gba *.agb *.gbz *.bin *.md *.smd *.gen *.sms)")
-        if len(filenames) == 0:
+    def action_add_roms(self):
+        system = window.combobox_console.currentData()
+        ext_filter = " ".join(["*." + f for f in frog_config.supported_rom_formats]) 
+        rom_paths, _ = QFileDialog.getOpenFileNames(self, "Select ROMs", '', f"ROM files ({ext_filter})")
+        if len(rom_paths) == 0:
             return
-        if filenames:
-            msgBox = DownloadProgressDialog()
-            msgBox.setText(" Copying "+ console + " Roms...")
-            games_copied = 1
-            msgBox.progress.reset()
-            msgBox.progress.setMaximum(len(filenames)+1)
-            msgBox.show()
-            QApplication.processEvents()
-            for filename in filenames:
-                games_copied += 1
-                msgBox.showProgress(games_copied, True)
-                #Additoinal safety to make sure this file exists...
-                try: 
-                    if os.path.isfile(filename):
-                        #Arcade needs the zip file in the /bin folder and we create the ZFB for it
-                        if console == 'ARCADE':
-                            consolePath = os.path.join(drive, console, 'bin')
-                            #Arcade also needs up to create the ZFB as its just the thumbnail + filename
-                            tadpole_functions.createZFBFile(drive, '', filename)
-                        else:
-                            consolePath = os.path.join(drive, console)
-                        shutil.copy(filename, consolePath)
-                        print (filename + " added to " + consolePath)
-                except Exception as e:
-                    logging.error("Can't copy because {e}")
-                    continue
-            msgBox.close()
-            qm = QMessageBox
-            ret = qm.question(self,'Add Thumbnails?', f"Added " + str(len(filenames)) + " ROMs to " + consolePath + "\n\nDo you want to add thumbnails?\n\n\
+        
+        progress = ProgressDialog(f"Adding {len(rom_paths)} ROMs in {system[0]}...", len(rom_paths), self)
+        progress.show()
+        for i, rom_path in enumerate(rom_paths):
+            # Manage progress
+            progress.setLabelText(f"Processing {os.path.basename(rom_path)}")
+            progress.setValue(i)
+            if progress.wasCanceled():
+                break
+
+            # Add ROM
+            # TODO IF multicore mode, copy in subfolder of ROMS....
+            frog_config.add_rom(rom_path, system)
+        
+        progress.close()
+        qm = QMessageBox
+        ret = qm.question(self,'Add Thumbnails?', f"Added {len(rom_paths)} ROMs to {system[0]}\n\nDo you want to add thumbnails?\n\n\
 Note: You can change in settings to either pick your own or try to downlad automatically.", qm.Yes | qm.No)
-            if ret == qm.Yes:
-                self.addBoxart()
-        RunFrogTool(drive,console)
+        if ret == qm.Yes:
+            self.addBoxart()
+        RunFrogTool(window.combobox_drive.currentText(),window.combobox_console.currentData())
+    
+
             
     def stripAllShortcutText(self):
         drive = self.combobox_drive.currentText()
@@ -1240,8 +1228,6 @@ Note: You can change in settings to either pick your own or try to downlad autom
     Action function to find all selected ROMs and delete them, then runfrogtool and reload the table
     """
     def deleteAllSelectedROMs(self):       
-        drive = self.combobox_drive.currentText()
-        console = self.combobox_console.currentText()
         qm = QMessageBox
         ret = qm.question(self,'Delete ROMs?', "Are you sure you want to delete all selected ROMs?" , qm.Yes | qm.No)
         if ret == qm.No:
@@ -1250,7 +1236,7 @@ Note: You can change in settings to either pick your own or try to downlad autom
         for item in self.tbl_gamelist.selectedItems():
             try:
                 objGame = self.ROMList[item.row()]
-                result = tadpole_functions.deleteROM(objGame.rom_path)
+                result = frog_config.delete_rom(objGame.rom_path)
             except Exception:
                 result = False
         if result: 
@@ -1313,7 +1299,7 @@ Note: You can change in settings to either pick your own or try to downlad autom
             for i,game in enumerate(files):
                 objGame = sf2000ROM(roms_path / game)
                 self.ROMList.append(objGame)
-                humanReadableFileSize = tadpole_functions.getHumanReadableFileSize(objGame.getFileSize())
+                humanReadableFileSize = objGame.getHumanFileSize()
                 # Filename
                 cell_filename = QTableWidgetItem(f"{objGame.title}")
                 cell_filename.setTextAlignment(Qt.AlignVCenter)
